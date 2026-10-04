@@ -153,6 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontSize: 13,
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w500,
+                            height: 1.4,
                           ),
                         ),
 
@@ -177,6 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       color: AppColors.danger,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
+                                      height: 1.4,
                                     ),
                                   ),
                                 ),
@@ -265,6 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontWeight: FontWeight.w700,
                             color: AppColors.textSecondary,
                             letterSpacing: 0.1,
+                            height: 1.4,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -273,62 +276,72 @@ class _LoginScreenState extends State<LoginScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: InkWell(
-                                onTap: () => _fillCredentials('cashier', 'cashier123'),
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primarySoft,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: AppColors.primaryBorder),
-                                  ),
-                                  child: const Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.point_of_sale_rounded, size: 22, color: AppColors.primary),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'Kasir (POS)',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
-                                      ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        'cashier / cashier123',
-                                        style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
-                                      ),
-                                    ],
+                              child: Semantics(
+                                button: true,
+                                label: 'Pilih role Kasir',
+                                child: InkWell(
+                                  onTap: () => _fillCredentials('cashier', 'cashier123'),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    constraints: const BoxConstraints(minHeight: 52),
+                                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primarySoft,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppColors.primaryBorder),
+                                    ),
+                                    child: const Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.point_of_sale_rounded, size: 22, color: AppColors.primary),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Kasir (POS)',
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'cashier / cashier123',
+                                          style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: InkWell(
-                                onTap: () => _fillCredentials('owner', 'owner123'),
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceSubtle,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: AppColors.border),
-                                  ),
-                                  child: const Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.insights_rounded, size: 22, color: AppColors.textPrimary),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'Owner (Bisnis)',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                                      ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        'owner / owner123',
-                                        style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
-                                      ),
-                                    ],
+                              child: Semantics(
+                                button: true,
+                                label: 'Pilih role Owner',
+                                child: InkWell(
+                                  onTap: () => _fillCredentials('owner', 'owner123'),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    constraints: const BoxConstraints(minHeight: 52),
+                                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surfaceSubtle,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                    child: const Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.insights_rounded, size: 22, color: AppColors.textPrimary),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Owner (Bisnis)',
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'owner / owner123',
+                                          style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
