@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/product_form_dialog.dart';
 import '../../widgets/stock_update_dialog.dart';
+import '../../widgets/recipe_editor_dialog.dart';
 
 class OwnerProductsScreen extends StatefulWidget {
   final PosProvider pos;
@@ -28,11 +29,35 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
     super.dispose();
   }
 
+  void _openRecipeEditor(Product product) {
+    final existingRecipe = widget.pos.getRecipeForProduct(product.id);
+    showDialog(
+      context: context,
+      builder: (context) => RecipeEditorDialog(
+        product: product,
+        initialRecipe: existingRecipe,
+        availableMaterials: widget.pos.activeRawMaterials,
+        onSave: (recipe) {
+          widget.pos.saveRecipe(recipe);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Resep untuk "${product.name}" berhasil disimpan.'),
+              backgroundColor: AppColors.primaryDark,
+            ),
+          );
+          setState(() {});
+        },
+      ),
+    );
+  }
+
   void _openProductForm([Product? productToEdit]) {
     showDialog(
       context: context,
       builder: (context) => ProductFormDialog(
         productToEdit: productToEdit,
+        currentRecipe: productToEdit != null ? widget.pos.getRecipeForProduct(productToEdit.id) : null,
+        onManageRecipe: productToEdit != null ? () => _openRecipeEditor(productToEdit) : null,
         onDelete: productToEdit != null ? () => _confirmDeleteProduct(productToEdit) : null,
         onSave: (product) {
           if (productToEdit != null) {
@@ -240,6 +265,7 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
                         isOwnerMode: true,
                         onEdit: () => _openProductForm(product),
                         onAdjustStock: () => _openStockAdjustment(product),
+                        onManageRecipe: () => _openRecipeEditor(product),
                       );
                     },
                   );
@@ -298,7 +324,13 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
                               Text('Stok: ${product.stock} pcs', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                             ],
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.menu_book_rounded, size: 18),
+                            color: AppColors.accentCaramel,
+                            tooltip: 'Resep Menu',
+                            onPressed: () => _openRecipeEditor(product),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.tune_rounded, size: 18),
                             color: AppColors.primary,

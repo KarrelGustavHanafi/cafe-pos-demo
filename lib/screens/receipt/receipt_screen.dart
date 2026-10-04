@@ -88,7 +88,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             const SizedBox(height: 10),
             const Text(
               'Catatan: Ini adalah demonstrasi alur pencetakan struk kasir Bluetooth/USB.',
-              style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -195,7 +195,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
               const SizedBox(height: 8),
               const Text(
                 'Struk PDF dan ringkasan transaksi akan dikirimkan ke nomor tersebut.',
-                style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
               ),
             ],
           ),

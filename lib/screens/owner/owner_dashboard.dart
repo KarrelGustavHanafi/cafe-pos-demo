@@ -715,7 +715,7 @@ class OwnerDashboard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   '${pos.rawMaterials.length} total bahan',
-                  style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted),
+                  style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -792,7 +792,7 @@ class OwnerDashboard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   '${pos.products.length} total menu',
-                  style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted),
+                  style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
                 ),
               ],
             ),

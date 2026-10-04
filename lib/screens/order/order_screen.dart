@@ -51,6 +51,15 @@ class _OrderScreenState extends State<OrderScreen> {
       );
     } else {
       widget.pos.addToCart(product);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${product.name} ditambahkan ke pesanan'),
+          duration: const Duration(milliseconds: 1200),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.primaryDark,
+        ),
+      );
     }
   }
 

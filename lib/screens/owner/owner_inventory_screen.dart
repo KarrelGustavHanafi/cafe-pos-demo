@@ -961,7 +961,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(color: AppColors.border),
                 ),
-                child: const Text('Nonaktif', style: TextStyle(fontSize: 9.5, color: AppColors.textMuted)),
+                child: const Text('Nonaktif', style: TextStyle(fontSize: 9.5, color: AppColors.textSecondary)),
               ),
             ],
           ],
@@ -1283,7 +1283,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
                       if (recipe == null || recipe.items.isEmpty)
                         const Text(
                           'Belum ada resep yang dipetakan untuk menu ini. Klik "Buat Resep" untuk memetakan bahan baku.',
-                          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontStyle: FontStyle.italic),
+                          style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
                         )
                       else ...[
                         const Text(
@@ -1520,7 +1520,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
                                 ),
                                 Text(
                                   '${adj.timestamp.day}/${adj.timestamp.month} ${adj.timestamp.hour.toString().padLeft(2, '0')}:${adj.timestamp.minute.toString().padLeft(2, '0')}',
-                                  style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                                  style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                                 ),
                               ],
                             );

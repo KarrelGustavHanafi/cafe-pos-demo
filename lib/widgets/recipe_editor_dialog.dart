@@ -304,7 +304,7 @@ class _RecipeEditorDialogState extends State<RecipeEditorDialog> {
                               SizedBox(height: 4),
                               Text(
                                 'Klik "+ Tambah Bahan" untuk menambahkan takaran bahan baku.',
-                                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                               ),
                             ],
                           ),

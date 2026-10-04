@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
+import '../models/recipe.dart';
 import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
+import 'shadcn_components.dart';
 
 class ProductFormDialog extends StatefulWidget {
   final Product? productToEdit;
   final VoidCallback? onDelete;
   final Function(Product product) onSave;
+  final VoidCallback? onManageRecipe;
+  final ProductRecipe? currentRecipe;
 
   const ProductFormDialog({
     super.key,
     this.productToEdit,
     this.onDelete,
     required this.onSave,
+    this.onManageRecipe,
+    this.currentRecipe,
   });
 
   @override
@@ -153,6 +159,17 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                       ],
                     ),
                   ),
+                  if (isEdit && widget.onManageRecipe != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ShadcnButton(
+                        variant: ShadButtonVariant.outline,
+                        height: 32,
+                        icon: const Icon(Icons.restaurant_menu_rounded, size: 14),
+                        text: 'Resep',
+                        onPressed: widget.onManageRecipe,
+                      ),
+                    ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
                     onPressed: () => Navigator.of(context).pop(),
@@ -523,6 +540,100 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                 value: _isActive,
                                 activeTrackColor: AppColors.primary,
                                 onChanged: (val) => setState(() => _isActive = val),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // Section 5: Resep & Komposisi Bahan Baku (Priority 1 UX Discovery)
+                      if (isEdit && widget.onManageRecipe != null) ...[
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            const Text(
+                              'Resep & Komposisi Bahan Baku',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (widget.currentRecipe != null &&
+                                widget.currentRecipe!.items.isNotEmpty)
+                              ShadcnBadge(
+                                label: '${widget.currentRecipe!.items.length} Bahan Baku',
+                                variant: ShadBadgeVariant.success,
+                                showDot: true,
+                              )
+                            else
+                              const ShadcnBadge(
+                                label: 'Belum Ada Resep',
+                                variant: ShadBadgeVariant.secondary,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ShadcnCard(
+                          padding: const EdgeInsets.all(14),
+                          backgroundColor: AppColors.surfaceSubtle,
+                          borderColor: AppColors.border,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primarySoft,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.primaryBorder),
+                                ),
+                                child: const Icon(
+                                  Icons.menu_book_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Hubungkan Takaran Bahan Baku',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      widget.currentRecipe != null &&
+                                              widget.currentRecipe!.items.isNotEmpty
+                                          ? widget.currentRecipe!.items
+                                              .map((i) =>
+                                                  '${i.materialName} (${i.quantity.toStringAsFixed(i.quantity.truncateToDouble() == i.quantity ? 0 : 1)} ${i.unit})')
+                                              .join(', ')
+                                          : 'Atur resep agar bahan baku otomatis terpotong dari stok inventaris saat pesanan kasir.',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              ShadcnButton(
+                                variant: ShadButtonVariant.primary,
+                                height: 36,
+                                icon: const Icon(Icons.tune_rounded, size: 14),
+                                text: 'Kelola Resep',
+                                onPressed: widget.onManageRecipe,
                               ),
                             ],
                           ),

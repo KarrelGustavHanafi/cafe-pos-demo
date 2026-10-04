@@ -137,7 +137,7 @@ class AppTypography {
   static const TextStyle caption = TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w400,
-    color: AppColors.textMuted,
+    color: AppColors.textSecondary,
   );
 
   static const TextStyle currency = TextStyle(

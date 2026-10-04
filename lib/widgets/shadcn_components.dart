@@ -865,7 +865,7 @@ class ShadcnDialog extends StatelessWidget {
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
                         icon: const Icon(Icons.close, size: 20),
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         splashRadius: 18,
                         tooltip: 'Tutup',
                       ),

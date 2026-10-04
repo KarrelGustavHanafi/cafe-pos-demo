@@ -20,7 +20,7 @@ class SalesBarChart extends StatelessWidget {
       return SizedBox(
         height: height,
         child: const Center(
-          child: Text('Belum ada data.', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          child: Text('Belum ada data.', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
         ),
       );
     }

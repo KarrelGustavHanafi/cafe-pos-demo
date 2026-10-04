@@ -10,6 +10,7 @@ class ProductCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onAdjustStock;
   final VoidCallback? onToggleActive;
+  final VoidCallback? onManageRecipe;
 
   const ProductCard({
     super.key,
@@ -20,6 +21,7 @@ class ProductCard extends StatelessWidget {
     this.onEdit,
     this.onAdjustStock,
     this.onToggleActive,
+    this.onManageRecipe,
   });
 
   IconData _getIconForProduct(Product product) {
@@ -326,7 +328,7 @@ class ProductCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 9.5,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.textMuted,
+                          color: AppColors.textSecondary,
                         ),
                       )
                     else
@@ -456,6 +458,17 @@ class ProductCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 2),
+                          // Recipe Button (Priority 1 UX Discovery)
+                          if (onManageRecipe != null)
+                            IconButton(
+                              onPressed: onManageRecipe,
+                              icon: const Icon(Icons.menu_book_rounded, size: 16),
+                              color: AppColors.accentCaramel,
+                              tooltip: 'Resep Menu',
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                            ),
                           // Quick Stock Adjustment
                           IconButton(
                             onPressed: onAdjustStock,

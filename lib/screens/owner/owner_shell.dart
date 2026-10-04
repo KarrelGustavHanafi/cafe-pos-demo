@@ -84,7 +84,7 @@ class _OwnerShellState extends State<OwnerShell> {
       case 0:
         return 'Dashboard Bisnis';
       case 1:
-        return 'POS Overview';
+        return 'Monitor Kasir (Live)';
       case 2:
         return 'Pesanan';
       case 3:
@@ -218,7 +218,7 @@ class _OwnerShellState extends State<OwnerShell> {
               children: [
                 _buildSectionHeader('RINGKASAN'),
                 _buildNavItem(0, Icons.dashboard_customize_rounded, 'Dashboard Bisnis'),
-                _buildNavItem(1, Icons.visibility_rounded, 'POS Overview (Live)'),
+                _buildNavItem(1, Icons.visibility_rounded, 'Monitor Kasir (Live)'),
 
                 const SizedBox(height: 6),
                 _buildSectionHeader('MENU & INVENTARIS'),
@@ -302,7 +302,7 @@ class _OwnerShellState extends State<OwnerShell> {
           fontSize: 9.5,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.8,
-          color: AppColors.textMuted,
+          color: AppColors.textSecondary,
         ),
       ),
     );
@@ -408,7 +408,7 @@ class _OwnerShellState extends State<OwnerShell> {
                 children: [
                   _buildSectionHeader('RINGKASAN'),
                   _buildNavItem(0, Icons.dashboard_customize_rounded, 'Dashboard Bisnis'),
-                  _buildNavItem(1, Icons.visibility_rounded, 'POS Overview (Live)'),
+                  _buildNavItem(1, Icons.visibility_rounded, 'Monitor Kasir (Live)'),
 
                   const SizedBox(height: 6),
                   _buildSectionHeader('MENU & INVENTARIS'),

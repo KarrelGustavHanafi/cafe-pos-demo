@@ -54,7 +54,7 @@ class CashierOrdersScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   const Text(
                     'Coba lakukan transaksi dari tab POS.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ],
               ),

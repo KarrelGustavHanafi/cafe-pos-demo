@@ -179,7 +179,7 @@ class CartView extends StatelessWidget {
                               Text(
                                 AppCurrency.format(item.itemTotal),
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.textPrimary,
                                 ),
@@ -220,9 +220,9 @@ class CartView extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 10.5,
+                                fontSize: 11,
                                 fontStyle: FontStyle.italic,
-                                color: AppColors.textMuted,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ],
