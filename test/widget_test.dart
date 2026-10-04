@@ -63,7 +63,7 @@ void main() {
   });
 
   group('Widget Role Separation & Presentation Test', () {
-    testWidgets('Renders Login Screen with Kopi Senja brand and demo login options', (WidgetTester tester) async {
+    testWidgets('Renders Login Screen with CAFFE brand and demo login options', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
