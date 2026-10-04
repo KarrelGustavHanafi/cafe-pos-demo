@@ -63,12 +63,16 @@ class PaymentSuccessScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
 
-                    const Text(
-                      'Pembayaran Berhasil!',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
+                    Semantics(
+                      header: true,
+                      headingLevel: 1,
+                      child: const Text(
+                        'Pembayaran Berhasil!',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -173,7 +177,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                     // Secondary Action: Start New Order
                     SizedBox(
                       width: double.infinity,
-                      height: 42,
+                      height: 44,
                       child: OutlinedButton.icon(
                         onPressed: onNewOrder,
                         icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
@@ -187,7 +191,10 @@ class PaymentSuccessScreen extends StatelessWidget {
                         onPressed: onGoToOwnerDashboard,
                         icon: const Icon(Icons.insights_rounded, size: 16),
                         label: const Text('Buka Dashboard Owner'),
-                        style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          minimumSize: const Size(0, 44),
+                        ),
                       ),
                     ],
                   ],

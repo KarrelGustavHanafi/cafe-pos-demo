@@ -251,7 +251,7 @@ class _OwnerShellState extends State<OwnerShell> {
             ),
           ),
 
-          // Presenter Demo Switch & Logout Action
+          // Presenter Demo Switch & Logout Action & Contact Info
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
@@ -268,7 +268,8 @@ class _OwnerShellState extends State<OwnerShell> {
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
                   ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    minimumSize: const Size(0, 44),
                     side: const BorderSide(color: AppColors.primaryBorder),
                     backgroundColor: AppColors.primarySoft,
                   ),
@@ -282,7 +283,18 @@ class _OwnerShellState extends State<OwnerShell> {
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                   ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    minimumSize: const Size(0, 44),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'demo@cafe.local • +62 812-3456-7890',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -323,7 +335,8 @@ class _OwnerShellState extends State<OwnerShell> {
         onTap: () => _navigateToTab(index),
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primarySoft : Colors.transparent,
             borderRadius: BorderRadius.circular(10),

@@ -32,7 +32,11 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Denah Meja Kafe', maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Denah Meja', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 14),
@@ -53,7 +57,7 @@ class _TableSelectionScreenState extends State<TableSelectionScreen> {
               ),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                minimumSize: const Size(0, 36),
+                minimumSize: const Size(0, 44),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),

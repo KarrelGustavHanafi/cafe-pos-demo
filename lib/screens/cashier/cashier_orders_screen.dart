@@ -22,10 +22,14 @@ class CashierOrdersScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(
-          paidOrders.isEmpty
-              ? 'Transaksi Hari Ini'
-              : 'Transaksi Hari Ini (${paidOrders.length})',
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: Text(
+            paidOrders.isEmpty
+                ? 'Pesanan Selesai'
+                : 'Pesanan Selesai (${paidOrders.length})',
+          ),
         ),
       ),
       body: paidOrders.isEmpty

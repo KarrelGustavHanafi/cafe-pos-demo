@@ -365,7 +365,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
                     // 2. Secondary Action: Send WhatsApp Receipt
                     SizedBox(
-                      height: 42,
+                      height: 44,
                       child: OutlinedButton.icon(
                         onPressed: () => _showWhatsAppSimulationDialog(context, order),
                         icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primaryDark),
@@ -384,7 +384,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
                     // 3. Navigation: New Order / Back to POS
                     SizedBox(
-                      height: 42,
+                      height: 44,
                       child: OutlinedButton.icon(
                         onPressed: widget.onBackToCashier,
                         icon: const Icon(Icons.add_shopping_cart_rounded, size: 16, color: AppColors.textSecondary),
@@ -405,7 +405,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         onPressed: widget.onGoToOwnerDashboard,
                         icon: const Icon(Icons.analytics_outlined, size: 15),
                         label: const Text('Lihat di Owner Dashboard', style: TextStyle(fontSize: 12)),
-                        style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          minimumSize: const Size(0, 44),
+                        ),
                       ),
                     ],
                   ],

@@ -536,7 +536,11 @@ class OwnerDashboard extends StatelessWidget {
     } else {
       greeting = '🌙 Selamat Malam, Owner';
     }
-    return Text(greeting);
+    return Semantics(
+      header: true,
+      headingLevel: 1,
+      child: Text(greeting),
+    );
   }
 
   /// Builds curated hourly chart data combining real orders + realistic demo baseline.

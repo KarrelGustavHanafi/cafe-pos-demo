@@ -189,7 +189,11 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Inventaris & Stok'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Inventaris & Stok'),
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(68),
           child: Column(

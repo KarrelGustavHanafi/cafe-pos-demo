@@ -466,8 +466,8 @@ class ProductCard extends StatelessWidget {
                               color: AppColors.accentCaramel,
                               tooltip: 'Resep Menu',
                               visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             ),
                           // Quick Stock Adjustment
                           IconButton(
@@ -476,8 +476,8 @@ class ProductCard extends StatelessWidget {
                             color: AppColors.primary,
                             tooltip: 'Update Stok',
                             visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                           ),
                           // Edit Product
                           IconButton(
@@ -486,8 +486,8 @@ class ProductCard extends StatelessWidget {
                             color: AppColors.textSecondary,
                             tooltip: 'Edit Produk',
                             visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                           ),
                         ],
                       ),

@@ -78,7 +78,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Pengaturan Kafe'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Pengaturan Kafe'),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -89,6 +93,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                minimumSize: const Size(0, 44),
               ),
             ),
           ),
@@ -179,6 +184,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: TextEditingController(text: 'demo@cafe.local'),
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Email Kontak (Demo)',
+                        prefixIcon: Icon(Icons.email_outlined, size: 18),
+                      ),
                     ),
                   ],
                 ),

@@ -145,9 +145,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Pembayaran Pesanan'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Pembayaran'),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          splashRadius: 20,
           onPressed: widget.onCancel,
         ),
       ),
@@ -513,6 +519,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return ActionChip(
       label: Text(label),
       backgroundColor: AppColors.surfaceSubtle,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
       onPressed: () {
         setState(() {

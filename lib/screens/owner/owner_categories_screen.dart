@@ -105,7 +105,11 @@ class _OwnerCategoriesScreenState extends State<OwnerCategoriesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Kelola Kategori Menu'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Kategori Menu'),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),

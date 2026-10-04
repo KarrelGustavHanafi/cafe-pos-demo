@@ -15,7 +15,11 @@ class OwnerShiftsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Monitoring Shift & Rekonsiliasi Kasir'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Monitoring Shift'),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

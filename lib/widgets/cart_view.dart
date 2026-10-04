@@ -93,6 +93,7 @@ class CartView extends StatelessWidget {
                       foregroundColor: AppColors.primaryDark,
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: const Size(64, 44),
                     ),
                   ),
               ],
@@ -247,7 +248,7 @@ class CartView extends StatelessWidget {
                                     foregroundColor: AppColors.primaryDark,
                                     visualDensity: VisualDensity.compact,
                                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                                    minimumSize: const Size(72, 40),
+                                    minimumSize: const Size(72, 44),
                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     textStyle: const TextStyle(
                                       fontSize: 12,
@@ -411,8 +412,8 @@ class CartView extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: SizedBox(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           child: Icon(icon, size: 18, color: color ?? AppColors.textPrimary),
         ),
       ),

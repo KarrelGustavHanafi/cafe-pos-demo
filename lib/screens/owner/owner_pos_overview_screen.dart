@@ -16,7 +16,11 @@ class OwnerPosOverviewScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Live POS Overview (Operasional Kafe)'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Monitor Kasir (Live)'),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

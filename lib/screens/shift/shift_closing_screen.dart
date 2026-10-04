@@ -51,9 +51,15 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Penutupan Shift Kasir (Shift Closing)'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Shift Kasir'),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          splashRadius: 20,
           onPressed: widget.onBackToDashboard,
         ),
       ),

@@ -8,6 +8,49 @@ export 'package:shadcn_flutter/shadcn_flutter.dart'
         BootstrapIcons,
         RadixIcons;
 
+/// Semantic Primary Page Heading (H1) for accessibility and SEO
+class PageHeadingH1 extends StatelessWidget {
+  final String title;
+  final TextStyle? style;
+  final Widget? child;
+
+  const PageHeadingH1(this.title, {super.key, this.style, this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      headingLevel: 1,
+      child: child ??
+          Text(
+            title,
+            style: style ?? AppTypography.pageTitle,
+          ),
+    );
+  }
+}
+
+/// Semantic Section Heading (H2) for accessibility
+class SectionHeadingH2 extends StatelessWidget {
+  final String title;
+  final TextStyle? style;
+  final Widget? child;
+
+  const SectionHeadingH2(this.title, {super.key, this.style, this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      headingLevel: 2,
+      child: child ??
+          Text(
+            title,
+            style: style ?? AppTypography.sectionTitle,
+          ),
+    );
+  }
+}
 
 /// Reusable Shadcn-styled Card Component
 class ShadcnCard extends StatelessWidget {
@@ -231,7 +274,7 @@ class ShadcnButton extends StatelessWidget {
     this.fullWidth = false,
     this.isLoading = false,
     this.padding,
-    this.height = 42,
+    this.height = 44,
   }) : assert(text != null || child != null);
 
   @override
@@ -527,6 +570,7 @@ class ShadcnTabs<T> extends StatelessWidget {
           borderRadius: AppRadius.roundedMd,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
+            constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: isSelected ? AppColors.primary : AppColors.surface,
@@ -632,6 +676,7 @@ class ShadcnSelectionTile extends StatelessWidget {
       borderRadius: AppRadius.roundedMd,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
+        constraints: const BoxConstraints(minHeight: 44),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primarySoft : AppColors.surface,
@@ -720,6 +765,7 @@ class ShadcnCheckboxTile extends StatelessWidget {
       borderRadius: AppRadius.roundedMd,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
+        constraints: const BoxConstraints(minHeight: 44),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isChecked ? AppColors.primarySoft : AppColors.surface,
@@ -848,9 +894,13 @@ class ShadcnDialog extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              title,
-                              style: AppTypography.sectionTitle.copyWith(fontSize: 17),
+                            Semantics(
+                              header: true,
+                              headingLevel: 2,
+                              child: Text(
+                                title,
+                                style: AppTypography.sectionTitle.copyWith(fontSize: 17),
+                              ),
                             ),
                             if (description != null) ...[
                               const SizedBox(height: 2),
@@ -866,7 +916,8 @@ class ShadcnDialog extends StatelessWidget {
                         onPressed: () => Navigator.of(context).pop(),
                         icon: const Icon(Icons.close, size: 20),
                         color: AppColors.textSecondary,
-                        splashRadius: 18,
+                        splashRadius: 20,
+                        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                         tooltip: 'Tutup',
                       ),
                     ],

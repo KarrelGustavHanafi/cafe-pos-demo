@@ -155,7 +155,11 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Katalog Menu & Manajemen Produk'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Katalog Menu (Produk)'),
+        ),
         actions: [
           // View Mode Switcher
           IconButton(

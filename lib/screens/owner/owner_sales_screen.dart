@@ -34,7 +34,11 @@ class _OwnerSalesScreenState extends State<OwnerSalesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Analisis Penjualan Lengkap'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Penjualan'),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

@@ -144,7 +144,11 @@ class _OwnerTablesScreenState extends State<OwnerTablesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Manajemen Tata Letak Meja'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Manajemen Meja'),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),

@@ -31,7 +31,11 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> with SingleTick
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Laporan Bisnis'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Laporan Bisnis'),
+        ),
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,

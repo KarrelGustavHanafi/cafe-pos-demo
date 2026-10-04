@@ -104,7 +104,11 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Riwayat & Daftar Pesanan'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Pesanan'),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

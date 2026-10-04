@@ -105,7 +105,11 @@ class _OwnerCustomersScreenState extends State<OwnerCustomersScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Data Pelanggan Kafe'),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Pelanggan'),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),

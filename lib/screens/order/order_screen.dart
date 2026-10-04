@@ -251,45 +251,49 @@ class _OrderScreenState extends State<OrderScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Search & Quick Preset Demo Row
-          LayoutBuilder(
-            builder: (context, c) {
-              final search = SizedBox(
-                height: 42,
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (val) => setState(() => _searchQuery = val),
-                  decoration: InputDecoration(
-                    hintText: 'Cari menu (Kopi, Matcha, Katsu...)',
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 16),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                ),
-              );
-              final preset = ShadcnButton(
-                onPressed: () {
-                  widget.pos.loadDemoQuickOrder();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Menu Demo Dimuat: 2x Kopi Susu Aren + 1x French Fries'),
-                      duration: Duration(seconds: 2),
-                      backgroundColor: AppColors.primaryDark,
+          Semantics(
+            header: true,
+            headingLevel: 1,
+            label: 'POS',
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final search = SizedBox(
+                  height: 44,
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    decoration: InputDecoration(
+                      hintText: 'Cari menu (Kopi, Matcha, Katsu...)',
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
-                  );
-                },
-                variant: ShadButtonVariant.outline,
-                icon: const Icon(Icons.bolt_rounded, size: 16, color: AppColors.accentAmber),
-                text: 'Preset Demo',
-                height: 42,
-              );
+                  ),
+                );
+                final preset = ShadcnButton(
+                  onPressed: () {
+                    widget.pos.loadDemoQuickOrder();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Menu Demo Dimuat: 2x Kopi Susu Aren + 1x French Fries'),
+                        duration: Duration(seconds: 2),
+                        backgroundColor: AppColors.primaryDark,
+                      ),
+                    );
+                  },
+                  variant: ShadButtonVariant.outline,
+                  icon: const Icon(Icons.bolt_rounded, size: 16, color: AppColors.accentAmber),
+                  text: 'Preset Demo',
+                  height: 44,
+                );
               // Stack the preset button under the search field when the two
               // cannot share the available width.
               if (c.maxWidth < 400) {
@@ -308,6 +312,7 @@ class _OrderScreenState extends State<OrderScreen> {
               );
             },
           ),
+        ),
 
           if (showTopCategoryChips) ...[
             const SizedBox(height: 12),

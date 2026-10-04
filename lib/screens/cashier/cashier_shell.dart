@@ -300,7 +300,8 @@ class _CashierShellState extends State<CashierShell> {
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
                   ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    minimumSize: const Size(0, 44),
                     side: const BorderSide(color: AppColors.primaryBorder),
                     backgroundColor: AppColors.primarySoft,
                   ),
@@ -314,7 +315,8 @@ class _CashierShellState extends State<CashierShell> {
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                   ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    minimumSize: const Size(0, 44),
                   ),
                 ),
               ],
@@ -339,7 +341,8 @@ class _CashierShellState extends State<CashierShell> {
         onTap: () => _navigateToTab(index),
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primarySoft : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
