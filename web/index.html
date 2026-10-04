@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="CAFFE POS Demo — Solusi Sistem Kasir (Point of Sale) & Manajemen Inventaris Kafe Modern.">
+  <meta name="theme-color" content="#0D9488">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CAFFE POS Demo">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>CAFFE POS Demo — Sistem Kasir & Manajemen Kafe Modern</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #F8FAF9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+    }
+    #loading-container {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #F8FAF9;
+      z-index: 999999;
+      transition: opacity 0.35s ease-out;
+      pointer-events: none;
+    }
+    .loading-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 32px 24px;
+    }
+    .loading-icon-wrapper {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #E6F4F2;
+      border: 2px solid #99D1CB;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 16px rgba(13, 148, 136, 0.12);
+      animation: pulseGlow 2s ease-in-out infinite;
+    }
+    .loading-icon-wrapper svg {
+      width: 36px;
+      height: 36px;
+      fill: #0D9488;
+    }
+    .loading-brand {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      color: #0F172A;
+      margin-bottom: 6px;
+    }
+    .loading-subtitle {
+      font-size: 13px;
+      color: #64748B;
+      font-weight: 500;
+      margin-bottom: 24px;
+    }
+    .loading-progress-bar {
+      width: 140px;
+      height: 4px;
+      background: #E2E8F0;
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .loading-progress-indicator {
+      width: 45%;
+      height: 100%;
+      background: #0D9488;
+      border-radius: 9999px;
+      position: absolute;
+      animation: progressSweep 1.5s ease-in-out infinite alternate;
+    }
+    @keyframes progressSweep {
+      0% {
+        left: 0%;
+        width: 30%;
+      }
+      100% {
+        left: 70%;
+        width: 30%;
+      }
+    }
+    @keyframes pulseGlow {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.04);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-container">
+    <div class="loading-card">
+      <div class="loading-icon-wrapper">
+        <svg viewBox="0 0 24 24">
+          <path d="M2,21H20V19H2M20,8H18V5H20M20,3H4V13A4,4 0 0,0 8,17H14A4,4 0 0,0 18,13V10H20A2,2 0 0,0 22,8V5C22,3.89 21.1,3 20,3Z" />
+        </svg>
+      </div>
+      <div class="loading-brand">CAFFE POS</div>
+      <div class="loading-subtitle">Memuat Demo Sistem Kasir & Manajemen Kafe...</div>
+      <div class="loading-progress-bar">
+        <div class="loading-progress-indicator"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function removeLoader() {
+      var loader = document.getElementById('loading-container');
+      if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(function() {
+          if (loader && loader.parentNode) {
+            loader.parentNode.removeChild(loader);
+          }
+        }, 400);
+      }
+    }
+
+    // Dismiss loader when Flutter renders first frame
+    window.addEventListener('flutter-first-frame', removeLoader);
+
+    // Observer fallback if flutter-first-frame is missed
+    var observer = new MutationObserver(function(mutations) {
+      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane')) {
+        setTimeout(removeLoader, 100);
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Maximum timeout safety fallback (5s)
+    setTimeout(removeLoader, 5000);
+  </script>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

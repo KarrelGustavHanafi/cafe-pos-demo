@@ -1,0 +1,3 @@
+# Cloudflare Pages SPA Routing Rules
+# Redirect all non-file routes to /index.html with HTTP 200 (SPA mode)
+/*    /index.html   200
