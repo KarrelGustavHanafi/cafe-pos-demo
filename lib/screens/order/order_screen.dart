@@ -6,6 +6,7 @@ import '../../widgets/cart_view.dart';
 import '../../widgets/demo_guide_widget.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/product_customization_dialog.dart';
+import '../../widgets/shadcn_components.dart';
 
 class OrderScreen extends StatefulWidget {
   final PosProvider pos;
@@ -264,7 +265,7 @@ class _OrderScreenState extends State<OrderScreen> {
                   ),
                 ),
               );
-              final preset = ElevatedButton.icon(
+              final preset = ShadcnButton(
                 onPressed: () {
                   widget.pos.loadDemoQuickOrder();
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -275,14 +276,10 @@ class _OrderScreenState extends State<OrderScreen> {
                     ),
                   );
                 },
+                variant: ShadButtonVariant.outline,
                 icon: const Icon(Icons.bolt_rounded, size: 16, color: AppColors.accentAmber),
-                label: const Text('Preset Demo', maxLines: 1, overflow: TextOverflow.ellipsis),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.surface,
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.border),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                ),
+                text: 'Preset Demo',
+                height: 42,
               );
               // Stack the preset button under the search field when the two
               // cannot share the available width.
@@ -305,38 +302,17 @@ class _OrderScreenState extends State<OrderScreen> {
 
           if (showTopCategoryChips) ...[
             const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: ProductCategory.values.map((cat) {
-                  final isSelected = _selectedCategory == cat;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(cat.label),
-                      selected: isSelected,
-                      selectedColor: AppColors.primarySoft,
-                      backgroundColor: AppColors.surface,
-                      labelStyle: TextStyle(
-                        color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primary : AppColors.border,
-                        ),
-                      ),
-                      onSelected: (_) => setState(() => _selectedCategory = cat),
-                    ),
-                  );
-                }).toList(),
-              ),
+            ShadcnTabs<ProductCategory>(
+              items: ProductCategory.values,
+              selectedItem: _selectedCategory,
+              onSelected: (cat) => setState(() => _selectedCategory = cat),
+              labelBuilder: (cat) => cat.label,
+              iconBuilder: (cat) => Icon(_getCategoryIcon(cat)),
             ),
           ],
 
           const SizedBox(height: 14),
+
 
           // Product Grid
           Expanded(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import 'state/pos_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
@@ -29,6 +30,12 @@ class _PosAppState extends State<PosApp> {
           title: 'CAFFE POS Demo',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
+          builder: (context, child) {
+            return shad.Theme(
+              data: AppTheme.shadcnTheme,
+              child: child!,
+            );
+          },
           home: _buildRootScreen(),
         );
       },

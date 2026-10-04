@@ -3,6 +3,7 @@ import '../models/product.dart';
 import '../models/cart_item.dart';
 import '../models/modifier.dart';
 import '../theme/app_theme.dart';
+import 'shadcn_components.dart';
 
 class ProductCustomizationDialog extends StatefulWidget {
   final Product product;
@@ -46,13 +47,31 @@ class ProductCustomizationDialog extends StatefulWidget {
       return showDialog(
         context: context,
         builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
-            child: ProductCustomizationDialog(
-              product: product,
-              initialCartItem: initialCartItem,
-              onConfirm: onConfirm,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500, maxHeight: 660),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: AppRadius.roundedLg,
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1A000000),
+                      blurRadius: 20,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ProductCustomizationDialog(
+                  product: product,
+                  initialCartItem: initialCartItem,
+                  onConfirm: onConfirm,
+                ),
+              ),
             ),
           ),
         ),
@@ -167,11 +186,11 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
       children: [
         // Header
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+          padding: const EdgeInsets.fromLTRB(18, 16, 12, 12),
           child: Row(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppRadius.roundedMd,
                 child: SizedBox(
                   width: 48,
                   height: 48,
@@ -189,47 +208,35 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.product.name,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      widget.product.name,
+                      style: AppTypography.sectionTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Harga Dasar: ${AppCurrency.format(widget.product.price)} • ${widget.product.category.label}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: AppTypography.supporting,
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.textMuted),
+                icon: const Icon(Icons.close, size: 20, color: AppColors.textMuted),
+                splashRadius: 18,
+                tooltip: 'Tutup',
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
           ),
         ),
-        const Divider(height: 1, color: AppColors.border),
+        const Divider(height: 1, thickness: 1, color: AppColors.border),
 
         // Scrollable Options Body
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             children: [
               if (activeGroups.isEmpty)
                 const Padding(
@@ -248,45 +255,23 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
               }),
 
               // Notes Input Field
-              const SizedBox(height: 12),
-              const Text(
-                'Catatan Pesanan (Opsional)',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
               const SizedBox(height: 6),
-              TextField(
+              ShadcnInput(
                 controller: _notesController,
+                label: 'Catatan Pesanan (Opsional)',
+                hintText: 'Contoh: Sedikit es, saus dipisah, tanpa sedotan...',
                 maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'Contoh: Sedikit es, saus dipisah, tanpa sedotan...',
-                  hintStyle: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                  filled: true,
-                  fillColor: AppColors.surfaceSubtle,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                ),
               ),
               const SizedBox(height: 16),
             ],
           ),
         ),
 
-        const Divider(height: 1, color: AppColors.border),
+        const Divider(height: 1, thickness: 1, color: AppColors.border),
 
         // Footer Actions with Quantity Stepper and Add Button
         Container(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
           color: AppColors.surface,
           child: Row(
             children: [
@@ -294,27 +279,30 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.surfaceSubtle,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.roundedMd,
                   border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.remove_rounded, size: 18),
+                      icon: const Icon(Icons.remove, size: 16),
                       padding: const EdgeInsets.all(6),
                       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
                     ),
-                    Text(
-                      '$_quantity',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        '$_quantity',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.add_rounded, size: 18),
+                      icon: const Icon(Icons.add, size: 16),
                       padding: const EdgeInsets.all(6),
                       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       onPressed: () => setState(() => _quantity++),
@@ -323,7 +311,7 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
                 ),
               ),
 
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
 
               // Confirm Button
               Expanded(
@@ -341,30 +329,44 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadius.roundedMd,
+                      ),
                     ),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Flexible(
                           child: Text(
-                            isEditing ? 'Simpan Perubahan' : 'Tambahkan ke Pesanan',
+                            isEditing ? 'Simpan' : 'Tambahkan ke Pesanan',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Text(
                           AppCurrency.format(_grandTotal),
-                          maxLines: 1,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
+
             ],
           ),
         ),
@@ -377,7 +379,7 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
     final selectedSet = _selections[group.id] ?? <ModifierOption>{};
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -386,107 +388,55 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
               Expanded(
                 child: Text(
                   group.name.toUpperCase(),
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
-                    letterSpacing: 0.8,
+                    letterSpacing: 0.6,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: group.isRequired ? AppColors.primarySoft : AppColors.surfaceSubtle,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  group.isRequired ? 'Wajib • Pilih 1' : 'Opsional',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    color: group.isRequired ? AppColors.primaryDark : AppColors.textMuted,
-                  ),
-                ),
+              ShadcnBadge(
+                label: group.isRequired ? 'Wajib • Pilih 1' : 'Opsional',
+                variant: group.isRequired ? ShadBadgeVariant.primary : ShadBadgeVariant.secondary,
               ),
             ],
           ),
-          const SizedBox(height: 10),
 
-          // Options Grid/Wrap
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: group.options.map((option) {
-              final isSelected = selectedSet.contains(option);
+          const SizedBox(height: 8),
 
-              return InkWell(
-                onTap: () {
-                  if (isSingle) {
-                    _handleSingleSelect(group, option);
-                  } else {
-                    _handleMultiSelect(group, option);
-                  }
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primarySoft : AppColors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.border,
-                      width: isSelected ? 1.6 : 1.0,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isSingle
-                            ? (isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded)
-                            : (isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded),
-                        size: 16,
-                        color: isSelected ? AppColors.primaryDark : AppColors.textMuted,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        option.name,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                          color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
-                        ),
-                      ),
-                      if (option.priceAdjustment > 0) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primary : AppColors.border,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '+${AppCurrency.format(option.priceAdjustment)}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? Colors.white : AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+          // Options Tiles
+          ...group.options.map((option) {
+            final isSelected = selectedSet.contains(option);
+            final priceExtra = option.priceAdjustment > 0
+                ? '+${AppCurrency.format(option.priceAdjustment)}'
+                : null;
+
+            if (isSingle) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: ShadcnSelectionTile(
+                  title: option.name,
+                  priceExtra: priceExtra,
+                  isSelected: isSelected,
+                  onTap: () => _handleSingleSelect(group, option),
                 ),
               );
-            }).toList(),
-          ),
+            } else {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: ShadcnCheckboxTile(
+                  title: option.name,
+                  priceExtra: priceExtra,
+                  isChecked: isSelected,
+                  onChanged: (_) => _handleMultiSelect(group, option),
+                ),
+              );
+            }
+          }),
         ],
       ),
     );
@@ -496,7 +446,7 @@ class _ProductCustomizationDialogState extends State<ProductCustomizationDialog>
     return Container(
       color: AppColors.primarySoft,
       child: const Center(
-        child: Icon(Icons.coffee_rounded, color: AppColors.primary, size: 24),
+        child: Icon(Icons.coffee, color: AppColors.primary, size: 24),
       ),
     );
   }
