@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
+import '../models/business_config.dart';
 import '../theme/app_theme.dart';
 
 class ReceiptWidget extends StatelessWidget {
   final Order order;
   final double? maxWidth;
+  final BusinessConfig? businessConfig;
 
   const ReceiptWidget({
     super.key,
     required this.order,
     this.maxWidth = 360,
+    this.businessConfig,
   });
 
   @override
@@ -53,10 +56,10 @@ class ReceiptWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            'CAFFE',
+          Text(
+            businessConfig?.businessName ?? 'CAFFE',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
               letterSpacing: 3,
@@ -64,10 +67,12 @@ class ReceiptWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          const Text(
-            'Jl. Senopati No. 45, Kebayoran Baru\nJakarta Selatan • Telp: (021) 7890-1234',
+          Text(
+            businessConfig != null
+                ? '${businessConfig!.address}${businessConfig!.phone.isNotEmpty ? '\nTelp: ${businessConfig!.phone}' : ''}'
+                : 'Jl. Senopati No. 45, Kebayoran Baru\nJakarta Selatan • Telp: (021) 7890-1234',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
               color: AppColors.textSecondary,
               height: 1.3,
@@ -171,9 +176,15 @@ class ReceiptWidget extends StatelessWidget {
           // Financial Summary
           _buildSummaryLine('Subtotal', AppCurrency.format(order.subtotal)),
           const SizedBox(height: 3),
-          _buildSummaryLine('Biaya Layanan (5%)', AppCurrency.format(order.serviceCharge)),
+          _buildSummaryLine(
+            'Biaya Layanan${order.subtotal > 0 && order.serviceCharge > 0 ? ' (${((order.serviceCharge / order.subtotal) * 100).toStringAsFixed(0)}%)' : ''}',
+            AppCurrency.format(order.serviceCharge),
+          ),
           const SizedBox(height: 3),
-          _buildSummaryLine('Pajak PB1 (10%)', AppCurrency.format(order.tax)),
+          _buildSummaryLine(
+            'Pajak PB1${order.subtotal > 0 && order.tax > 0 ? ' (${((order.tax / order.subtotal) * 100).toStringAsFixed(0)}%)' : ''}',
+            AppCurrency.format(order.tax),
+          ),
           const SizedBox(height: 6),
           const Divider(thickness: 1.2, color: AppColors.textPrimary),
           const SizedBox(height: 4),
@@ -214,10 +225,12 @@ class ReceiptWidget extends StatelessWidget {
 
           const SizedBox(height: 16),
           // Footer
-          const Text(
-            '*** TERIMA KASIH ***\nNikmati Harimu Bersama Caffe\nWiFi ID: Caffe_Guest • Pass: caffekopi',
+          Text(
+            businessConfig?.receiptFooter.isNotEmpty == true
+                ? businessConfig!.receiptFooter
+                : '*** TERIMA KASIH ***\nNikmati Harimu Bersama Caffe\nWiFi ID: Caffe_Guest • Pass: caffekopi',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 10,
               color: AppColors.textSecondary,
               height: 1.4,

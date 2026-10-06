@@ -22,6 +22,12 @@ class _PosAppState extends State<PosApp> {
   final PosProvider _posProvider = PosProvider();
 
   @override
+  void initState() {
+    super.initState();
+    _posProvider.loadPersistedConfig();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: _posProvider,

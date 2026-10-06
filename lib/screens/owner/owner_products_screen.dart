@@ -158,7 +158,7 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
         title: Semantics(
           header: true,
           headingLevel: 1,
-          child: const Text('Katalog Menu (Produk)'),
+          child: const Text('Menu'),
         ),
         actions: [
           // View Mode Switcher
@@ -168,7 +168,7 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
             onPressed: () => setState(() => _isGridView = !_isGridView),
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.only(right: 14),
             child: ElevatedButton.icon(
               onPressed: () => _openProductForm(),
               icon: const Icon(Icons.add_rounded, size: 16),
@@ -176,6 +176,7 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               ),
             ),
           ),
@@ -186,63 +187,96 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Search Bar & Filter Chips
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 40,
-                            child: TextField(
-                              controller: _searchController,
-                              onChanged: (val) => setState(() => _search = val),
-                              decoration: const InputDecoration(
-                                hintText: 'Cari menu berdasarkan nama, deskripsi, atau SKU...',
-                                prefixIcon: Icon(Icons.search_rounded, size: 18),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                              ),
+            // Search Bar & Filter Chips Panel
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: AppRadius.roundedMd,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 38,
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (val) => setState(() => _search = val),
+                            decoration: const InputDecoration(
+                              hintText: 'Cari menu...',
+                              prefixIcon: Icon(Icons.search_rounded, size: 18),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: ProductCategory.values.map((cat) {
-                          final isSelected = _category == cat;
-                          final count = widget.pos.getProductCountForCategory(cat);
-
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: ChoiceChip(
-                              label: Text('${cat.label} ($count)', style: const TextStyle(fontSize: 11)),
-                              selected: isSelected,
-                              selectedColor: AppColors.primarySoft,
-                              backgroundColor: AppColors.surface,
-                              onSelected: (_) => setState(() => _category = cat),
-                            ),
-                          );
-                        }).toList(),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: ProductCategory.values.map((cat) {
+                        final isSelected = _category == cat;
+                        final count = widget.pos.getProductCountForCategory(cat);
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text('${cat.label} ($count)', style: const TextStyle(fontSize: 11)),
+                            selected: isSelected,
+                            selectedColor: AppColors.primarySoft,
+                            backgroundColor: AppColors.surface,
+                            onSelected: (_) => setState(() => _category = cat),
+                          ),
+                        );
+                      }).toList(),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             if (products.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(40),
+              Padding(
+                padding: const EdgeInsets.all(32),
                 child: Center(
-                  child: Text('Tidak ada menu yang sesuai kriteria.', style: TextStyle(color: AppColors.textSecondary)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: const BoxDecoration(
+                          color: AppColors.surfaceSubtle,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.search_off_rounded,
+                          size: 32,
+                          color: AppColors.textMuted.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Tidak ada menu yang sesuai',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Coba ubah filter atau kata kunci pencarian.',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else if (_isGridView)
@@ -258,9 +292,9 @@ class _OwnerProductsScreenState extends State<OwnerProductsScreen> {
                     itemCount: products.length,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: crossAxisCount,
-                      mainAxisExtent: 225,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
+                      mainAxisExtent: 215,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
                     ),
                     itemBuilder: (context, index) {
                       final product = products[index];

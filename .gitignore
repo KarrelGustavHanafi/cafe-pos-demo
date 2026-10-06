@@ -51,3 +51,6 @@ app.*.map.json
 .env*
 .wrangler/
 
+# Remotion motion design workspace
+remotion/node_modules/
+

@@ -23,7 +23,7 @@ class CartView extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.roundedLg,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -34,7 +34,7 @@ class CartView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
               color: AppColors.primarySoft,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
               border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
             ),
             child: Row(
@@ -295,7 +295,7 @@ class CartView extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
               color: AppColors.surfaceSubtle,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(13)),
               border: Border(top: BorderSide(color: AppColors.border)),
             ),
             child: Column(

@@ -170,7 +170,7 @@ class _OrderScreenState extends State<OrderScreen> {
 
   Widget _buildDesktopCategorySidebar() {
     return Container(
-      width: 160,
+      width: 150,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(right: BorderSide(color: AppColors.border, width: 1)),
@@ -179,47 +179,51 @@ class _OrderScreenState extends State<OrderScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
+            padding: EdgeInsets.fromLTRB(14, 14, 14, 8),
             child: Text(
-              'KATEGORI MENU',
+              'KATEGORI',
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textMuted,
-                letterSpacing: 0.8,
+                letterSpacing: 0.6,
               ),
             ),
           ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               children: ProductCategory.values.map((cat) {
                 final isSelected = _selectedCategory == cat;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 1),
                   child: InkWell(
                     onTap: () => setState(() => _selectedCategory = cat),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      constraints: const BoxConstraints(minHeight: 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
                         color: isSelected ? AppColors.primarySoft : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: isSelected ? AppColors.primaryBorder : Colors.transparent,
+                          width: isSelected ? 1.2 : 0,
                         ),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             _getCategoryIcon(cat),
-                            size: 16,
+                            size: 15,
                             color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               cat.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
@@ -258,13 +262,13 @@ class _OrderScreenState extends State<OrderScreen> {
             child: LayoutBuilder(
               builder: (context, c) {
                 final search = SizedBox(
-                  height: 44,
+                  height: 42,
                   child: TextField(
                     controller: _searchController,
                     onChanged: (val) => setState(() => _searchQuery = val),
                     decoration: InputDecoration(
-                      hintText: 'Cari menu (Kopi, Matcha, Katsu...)',
-                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+                      hintText: 'Cari menu...',
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 18),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 16),
@@ -291,8 +295,8 @@ class _OrderScreenState extends State<OrderScreen> {
                   },
                   variant: ShadButtonVariant.outline,
                   icon: const Icon(Icons.bolt_rounded, size: 16, color: AppColors.accentAmber),
-                  text: 'Preset Demo',
-                  height: 44,
+                  text: 'Demo',
+                  height: 42,
                 );
               // Stack the preset button under the search field when the two
               // cannot share the available width.
@@ -379,73 +383,56 @@ class _OrderScreenState extends State<OrderScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.primaryDark,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: InkWell(
         onTap: () => _openMobileCartBottomSheet(context),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
-                    ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        '${widget.pos.cartItemCount} Menu',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 15),
               ),
               const SizedBox(width: 10),
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        AppCurrency.format(widget.pos.cartGrandTotal),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_rounded, color: Colors.white70, size: 16),
-                  ],
+              Expanded(
+                child: Text(
+                  '${widget.pos.cartItemCount} Menu',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
+              Text(
+                AppCurrency.format(widget.pos.cartGrandTotal),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.arrow_forward_rounded, color: Colors.white70, size: 15),
             ],
           ),
         ),

@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/order.dart';
+import '../../models/business_config.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../services/payment/payment_service.dart';
+import '../../services/payment/qris_payment_service.dart';
 
 enum QrisSimulationStep {
   showQr,
   waiting,
   detected,
+  verifying,
   success,
 }
 
@@ -36,6 +40,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   // QRIS Simulation State
   QrisSimulationStep _qrisStep = QrisSimulationStep.showQr;
   Timer? _qrisTimer;
+  PaymentService? _paymentService;
+  StreamSubscription<PaymentStatus>? _paymentSub;
 
   @override
   void initState() {
@@ -76,9 +82,29 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   void dispose() {
+    _cancelQrisSimulation();
     _cashController.dispose();
-    _qrisTimer?.cancel();
     super.dispose();
+  }
+
+  void _cancelQrisSimulation() {
+    _paymentSub?.cancel();
+    _paymentSub = null;
+    if (_paymentService != null) {
+      _paymentService!.cancelPayment('cancelled-by-cashier');
+      _paymentService!.dispose();
+      _paymentService = null;
+    }
+    _qrisTimer?.cancel();
+    _qrisTimer = null;
+  }
+
+  void _resetQrisSimulation() {
+    _cancelQrisSimulation();
+    if (mounted) {
+      setState(() => _qrisStep = QrisSimulationStep.showQr);
+    }
+    debugPrint('[QRIS] State: SHOW_QR');
   }
 
   int get _changeAmount {
@@ -115,23 +141,56 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  void _triggerQrisSimulation() {
+  void _triggerQrisSimulation() async {
+    _cancelQrisSimulation();
+
     setState(() => _qrisStep = QrisSimulationStep.waiting);
 
-    _qrisTimer = Timer(const Duration(milliseconds: 800), () {
+    final service = widget.pos.createPaymentServiceForMethod(PaymentMethod.qris);
+    _paymentService = service;
+
+    final orderNum = widget.pos.currentOrder?.orderNumber ?? widget.pos.generateOrderNumber();
+
+    // Listen to status stream for transitions
+    _paymentSub = service.statusStream.listen((status) {
       if (!mounted) return;
-      setState(() => _qrisStep = QrisSimulationStep.detected);
-
-      _qrisTimer = Timer(const Duration(milliseconds: 700), () {
-        if (!mounted) return;
-        setState(() => _qrisStep = QrisSimulationStep.success);
-
-        _qrisTimer = Timer(const Duration(milliseconds: 500), () {
-          if (!mounted) return;
-          _handlePay();
-        });
-      });
+      switch (status) {
+        case PaymentStatus.waiting:
+          setState(() => _qrisStep = QrisSimulationStep.waiting);
+          break;
+        case PaymentStatus.detected:
+          setState(() => _qrisStep = QrisSimulationStep.detected);
+          break;
+        case PaymentStatus.verifying:
+          setState(() => _qrisStep = QrisSimulationStep.verifying);
+          break;
+        case PaymentStatus.success:
+          setState(() => _qrisStep = QrisSimulationStep.success);
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted && _selectedMethod == PaymentMethod.qris && !_isProcessing) {
+              _handlePay();
+            }
+          });
+          break;
+        case PaymentStatus.cancelled:
+        case PaymentStatus.failed:
+        case PaymentStatus.expired:
+          setState(() => _qrisStep = QrisSimulationStep.showQr);
+          break;
+        default:
+          break;
+      }
     });
+
+    await service.createPayment(
+      orderNumber: orderNum,
+      amount: widget.pos.cartGrandTotal,
+      method: PaymentMethod.qris,
+    );
+
+    if (service is MockQrisPaymentService) {
+      service.startSimulation();
+    }
   }
 
   @override
@@ -326,9 +385,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
             _buildCostLine('Subtotal', AppCurrency.format(pos.cartSubtotal)),
             const SizedBox(height: 4),
-            _buildCostLine('Biaya Layanan (5%)', AppCurrency.format(pos.cartServiceCharge)),
+            _buildCostLine(
+              'Biaya Layanan${pos.businessConfig.isServiceEnabled ? ' (${pos.businessConfig.serviceChargePercent.toStringAsFixed(0)}%)' : ''}',
+              AppCurrency.format(pos.cartServiceCharge),
+            ),
             const SizedBox(height: 4),
-            _buildCostLine('Pajak PB1 (10%)', AppCurrency.format(pos.cartTax)),
+            _buildCostLine(
+              'Pajak PB1${pos.businessConfig.isTaxEnabled ? ' (${pos.businessConfig.taxPercent.toStringAsFixed(0)}%)' : ''}',
+              AppCurrency.format(pos.cartTax),
+            ),
           ],
         ),
       ),
@@ -402,12 +467,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final isSelected = _selectedMethod == method;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() {
-          _selectedMethod = method;
-          if (method == PaymentMethod.qris) {
-            _qrisStep = QrisSimulationStep.showQr;
+        onTap: () {
+          if (_selectedMethod != method) {
+            _cancelQrisSimulation();
+            setState(() {
+              _selectedMethod = method;
+              if (method == PaymentMethod.qris) {
+                _qrisStep = QrisSimulationStep.showQr;
+                debugPrint('[QRIS] State: SHOW_QR');
+              }
+            });
           }
-        }),
+        },
         borderRadius: BorderRadius.circular(10),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -531,6 +602,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildQrisMethodView(int total) {
+    final qrisConfig = widget.pos.businessConfig.qrisConfig;
+    final isStatic = qrisConfig.paymentMode == QrisPaymentMode.staticQris;
+    final isRealGateway = qrisConfig.paymentMode == QrisPaymentMode.realGateway;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -549,9 +624,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   color: AppColors.primaryDark,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  'QRIS CAFFE',
-                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1),
+                child: Text(
+                  qrisConfig.merchantName.toUpperCase(),
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1),
                 ),
               ),
             ],
@@ -585,52 +660,202 @@ class _PaymentScreenState extends State<PaymentScreen> {
             AppCurrency.format(total),
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.primaryDark),
           ),
+          const SizedBox(height: 4),
+          Text(
+            qrisConfig.merchantId,
+            style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 12),
 
-          // QRIS Simulation Steps & Controls
-          if (_qrisStep == QrisSimulationStep.showQr) ...[
+          // STATIC QRIS MODE
+          if (isStatic) ...[
             const Text(
-              'Pelanggan dapat melakukan scan QR di atas menggunakan e-Wallet / M-Banking.',
+              'Tunjukkan QR kepada pelanggan. Setelah dana masuk ke rekening/aplikasi merchant, klik tombol di bawah:',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              height: 42,
+              height: 44,
               child: ElevatedButton.icon(
-                onPressed: _triggerQrisSimulation,
-                icon: const Icon(Icons.play_circle_filled_rounded, size: 18),
-                label: const Text('Simulasi Pelanggan Scan & Bayar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                onPressed: _isProcessing ? null : _handlePay,
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryDark),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                label: const Text('Konfirmasi Pembayaran Diterima', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               ),
             ),
-          ] else if (_qrisStep == QrisSimulationStep.waiting) ...[
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
-                SizedBox(width: 8),
-                Text('Menunggu sinyal pembayaran dari gateway...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
-              ],
-            ),
-          ] else if (_qrisStep == QrisSimulationStep.detected) ...[
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
-                SizedBox(width: 6),
-                Text('Pembayaran QRIS Terdeteksi! Memverifikasi...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.success)),
-              ],
+          ] else if (isRealGateway) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.infoSoft,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+              ),
+              child: const Text(
+                'Mode Real Gateway (Backend STUB): Webhook backend belum aktif pada fase demo ini. Beralih ke mode Simulasi pada Pengaturan Integrasi untuk demonstrasi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: AppColors.info, fontWeight: FontWeight.w600),
+              ),
             ),
           ] else ...[
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.verified_rounded, color: AppColors.success, size: 20),
-                SizedBox(width: 6),
-                Text('Pembayaran Berhasil!', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.success)),
-              ],
-            ),
+            // SIMULATION MODE
+            if (_qrisStep == QrisSimulationStep.showQr) ...[
+              const Text(
+                'Pelanggan dapat melakukan scan QR di atas menggunakan e-Wallet / M-Banking.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 42,
+                child: ElevatedButton.icon(
+                  onPressed: _triggerQrisSimulation,
+                  icon: const Icon(Icons.play_circle_filled_rounded, size: 18),
+                  label: const Text('Simulasi Pelanggan Scan & Bayar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ] else if (_qrisStep == QrisSimulationStep.waiting) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primaryBorder),
+                ),
+                child: const Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryDark)),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Menunggu pembayaran pelanggan...',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Sesi QRIS aktif. Memantau sinyal pembayaran dari gateway...',
+                      style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _resetQrisSimulation,
+                icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
+                label: const Text('Batalkan Simulasi', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+              ),
+            ] else if (_qrisStep == QrisSimulationStep.detected) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.infoSoft,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+                ),
+                child: const Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle_rounded, color: AppColors.info, size: 18),
+                        SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Pembayaran QRIS Terdeteksi!',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.info),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Menghubungkan ke gateway penyelesaian...',
+                      style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (_qrisStep == QrisSimulationStep.verifying) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.warningSoft,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                ),
+                child: const Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.warning)),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Memverifikasi Settlement...',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.warning),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Memastikan mutasi dana dan settlement transaksi valid...',
+                      style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.successSoft,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                ),
+                child: const Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.verified_rounded, color: AppColors.success, size: 20),
+                        SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Pembayaran Berhasil!',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.success),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Menerbitkan bukti pembayaran dan struk...',
+                      style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ],
       ),

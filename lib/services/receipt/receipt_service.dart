@@ -1,0 +1,88 @@
+import 'dart:async';
+import '../../models/order.dart';
+import '../../models/business_config.dart';
+import '../../models/receipt_data.dart';
+import '../printer/printer_service.dart';
+import '../printer/receipt_formatter.dart';
+import '../printer/preview_printer_service.dart';
+import '../printer/browser_print_service.dart';
+import '../printer/esc_pos_printer_service.dart';
+
+class ReceiptService {
+  final ReceiptFormatter formatter;
+  PrinterService _printerService;
+  ReceiptData? _lastReceipt;
+  final List<ReceiptData> _receiptHistory = [];
+
+  ReceiptService({
+    ReceiptFormatter? formatter,
+    PrinterService? printerService,
+  })  : formatter = formatter ?? ReceiptFormatter(),
+        _printerService = printerService ?? PreviewPrinterService();
+
+  PrinterService get printerService => _printerService;
+  ReceiptData? get lastReceipt => _lastReceipt;
+  List<ReceiptData> get receiptHistory => List.unmodifiable(_receiptHistory);
+
+  void updatePrinterMode(PrinterModeType mode, {String? host, int? port}) {
+    switch (mode) {
+      case PrinterModeType.preview:
+        _printerService = PreviewPrinterService(formatter: formatter);
+        break;
+      case PrinterModeType.browserPrint:
+        _printerService = BrowserPrintService(formatter: formatter);
+        break;
+      case PrinterModeType.escPos:
+        _printerService = EscPosPrinterService(
+          formatter: formatter,
+          printerHost: host ?? '192.168.1.200',
+          printerPort: port ?? 9100,
+        );
+        break;
+    }
+  }
+
+  void setCustomPrinter(PrinterService customPrinter) {
+    _printerService = customPrinter;
+  }
+
+  ReceiptData buildReceiptData(Order order, BusinessConfig config) {
+    return ReceiptData.fromOrder(order, config);
+  }
+
+  Future<PrinterResult> printOrderReceipt(Order order, BusinessConfig config) async {
+    final receiptData = buildReceiptData(order, config);
+    return printReceipt(receiptData);
+  }
+
+  Future<PrinterResult> printReceipt(ReceiptData receipt) async {
+    _lastReceipt = receipt;
+    _receiptHistory.insert(0, receipt);
+    if (_receiptHistory.length > 50) {
+      _receiptHistory.removeLast();
+    }
+    return _printerService.printReceipt(receipt);
+  }
+
+  Future<PrinterResult> reprintReceipt(String orderNumber) async {
+    final found = _receiptHistory.firstWhere(
+      (r) => r.orderNumber == orderNumber,
+      orElse: () => _lastReceipt ?? (throw StateError('Struk tidak ditemukan untuk dicetak ulang.')),
+    );
+    return _printerService.printReceipt(found);
+  }
+
+  Future<PrinterResult> reprintLastReceipt() async {
+    if (_lastReceipt == null) {
+      return PrinterResult.failure(
+        message: 'Belum ada transaksi struk yang dapat dicetak ulang.',
+        state: PrinterConnectionState.error,
+      );
+    }
+    return _printerService.printReceipt(_lastReceipt!);
+  }
+
+  String formatReceiptPlainText(ReceiptData receipt) {
+    return formatter.formatPlainText(receipt);
+  }
+}

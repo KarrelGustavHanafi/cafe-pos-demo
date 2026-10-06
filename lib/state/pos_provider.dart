@@ -11,7 +11,19 @@ import '../models/cafe_settings.dart';
 import '../models/raw_material.dart';
 import '../models/recipe.dart';
 import '../models/modifier.dart';
+import '../models/business_config.dart';
+import '../models/receipt_data.dart';
 import '../data/mock_data.dart';
+import '../services/storage/app_storage.dart';
+import '../services/storage/local_app_storage.dart';
+import '../services/config/business_config_service.dart';
+import '../services/payment/payment_service.dart';
+import '../services/payment/mock_payment_service.dart';
+import '../services/payment/qris_payment_service.dart';
+import '../services/printer/printer_service.dart';
+import '../services/telegram/telegram_service.dart';
+import '../services/telegram/telegram_bot_service.dart';
+import '../services/receipt/receipt_service.dart';
 
 class PosProvider extends ChangeNotifier {
   User? _currentUser;
@@ -24,6 +36,11 @@ class PosProvider extends ChangeNotifier {
   late List<Customer> _customers;
   late List<StockAdjustment> _stockAdjustments;
   late CafeSettings _settings;
+  late BusinessConfig _businessConfig;
+  late AppStorage _storage;
+  late BusinessConfigService _configService;
+  late ReceiptService _receiptService;
+  late TelegramService _telegramService;
   late List<RawMaterial> _rawMaterials;
   late Map<String, ProductRecipe> _recipes;
 
@@ -32,11 +49,19 @@ class PosProvider extends ChangeNotifier {
   final List<CartItem> _cart = [];
   Order? _currentOrder; // Active pending/just-paid order
 
-  PosProvider() {
-    _initData();
+  PosProvider({AppStorage? storage, BusinessConfigService? configService}) {
+    _initData(storage: storage, configService: configService);
+    loadPersistedConfig();
   }
 
-  void _initData() {
+  void _initData({AppStorage? storage, BusinessConfigService? configService}) {
+    _storage = storage ?? LocalAppStorage();
+    _configService = configService ?? LocalBusinessConfigService(_storage);
+    _businessConfig = _configService.config;
+    _receiptService = ReceiptService();
+    _receiptService.updatePrinterMode(_businessConfig.printerMode);
+    _telegramService = TelegramBotService(config: _businessConfig.telegramConfig);
+
     _products = MockData.getInitialProducts();
     _tables = MockData.getInitialTables();
     _currentShift = MockData.getInitialShift();
@@ -71,6 +96,11 @@ class PosProvider extends ChangeNotifier {
   List<Customer> get customers => List.unmodifiable(_customers);
   List<StockAdjustment> get stockAdjustments => List.unmodifiable(_stockAdjustments);
   CafeSettings get settings => _settings;
+  BusinessConfig get businessConfig => _businessConfig;
+  BusinessConfigService get configService => _configService;
+  ReceiptService get receiptService => _receiptService;
+  PrinterService get printerService => _receiptService.printerService;
+  TelegramService get telegramService => _telegramService;
   CafeTable? get selectedTable => _selectedTable;
   List<CartItem> get cart => List.unmodifiable(_cart);
   Order? get currentOrder => _currentOrder;
@@ -269,11 +299,11 @@ class PosProvider extends ChangeNotifier {
 
   // Order Calculations
   int get cartSubtotal => _cart.fold<int>(0, (sum, item) => sum + item.itemTotal);
-  int get cartServiceCharge => _settings.isServiceEnabled
-      ? (cartSubtotal * _settings.serviceChargeRate).round()
+  int get cartServiceCharge => _businessConfig.isServiceEnabled
+      ? (cartSubtotal * _businessConfig.serviceChargeRate).round()
       : 0;
-  int get cartTax => _settings.isTaxEnabled
-      ? (cartSubtotal * _settings.taxRate).round()
+  int get cartTax => _businessConfig.isTaxEnabled
+      ? (cartSubtotal * _businessConfig.taxRate).round()
       : 0;
   int get cartGrandTotal => cartSubtotal + cartServiceCharge + cartTax;
   int get cartItemCount => _cart.fold<int>(0, (sum, item) => sum + item.quantity);
@@ -286,7 +316,7 @@ class PosProvider extends ChangeNotifier {
         '${now.day.toString().padLeft(2, '0')}';
     final count = _orders.length + 1;
     final seqStr = count.toString().padLeft(4, '0');
-    return '${_settings.orderNumberPrefix}-$dateStr-$seqStr';
+    return '${_businessConfig.orderNumberPrefix}-$dateStr-$seqStr';
   }
 
   // Checkout flow: prepare order
@@ -791,11 +821,203 @@ class PosProvider extends ChangeNotifier {
   }
 
   // ==========================================
-  // OWNER: SETTINGS MANAGEMENT
+  // OWNER: SETTINGS & BUSINESS CONFIG MANAGEMENT
   // ==========================================
   void updateSettings(CafeSettings newSettings) {
     _settings = newSettings;
+    _businessConfig = _businessConfig.copyWith(
+      businessName: newSettings.cafeName,
+      logoUrl: newSettings.logoUrl,
+      address: newSettings.address,
+      phone: newSettings.phone,
+      instagram: newSettings.instagram,
+      isTaxEnabled: newSettings.isTaxEnabled,
+      isServiceEnabled: newSettings.isServiceEnabled,
+      taxPercent: newSettings.taxRate * 100,
+      serviceChargePercent: newSettings.serviceChargeRate * 100,
+      receiptFooter: newSettings.receiptFooter,
+      orderNumberPrefix: newSettings.orderNumberPrefix,
+      defaultLowStockThreshold: newSettings.defaultLowStockThreshold,
+    );
+    _configService.saveConfig(_businessConfig);
     notifyListeners();
+  }
+
+  Future<void>? _loadConfigFuture;
+
+  Future<void> loadPersistedConfig() {
+    _loadConfigFuture = _doLoadPersistedConfig();
+    return _loadConfigFuture!;
+  }
+
+  Future<void> _doLoadPersistedConfig() async {
+    try {
+      await _storage.init();
+      await _configService.init();
+      final loaded = _configService.config;
+      _businessConfig = loaded;
+      _settings = _settings.copyWith(
+        cafeName: loaded.businessName,
+        logoUrl: loaded.logoUrl,
+        address: loaded.address,
+        phone: loaded.phone,
+        instagram: loaded.instagram,
+        isTaxEnabled: loaded.isTaxEnabled,
+        isServiceEnabled: loaded.isServiceEnabled,
+        taxRate: loaded.taxRate,
+        serviceChargeRate: loaded.serviceChargeRate,
+        receiptFooter: loaded.receiptFooter,
+        orderNumberPrefix: loaded.orderNumberPrefix,
+        defaultLowStockThreshold: loaded.defaultLowStockThreshold,
+      );
+      _receiptService.updatePrinterMode(loaded.printerMode);
+      _telegramService = TelegramBotService(config: loaded.telegramConfig);
+      notifyListeners();
+    } catch (_) {
+      // Graceful fallback: maintain defaults without crash
+    }
+  }
+
+  Future<void> updateBusinessConfig(BusinessConfig newConfig) async {
+    if (_loadConfigFuture != null) {
+      await _loadConfigFuture;
+    }
+    _businessConfig = newConfig;
+    _settings = _settings.copyWith(
+      cafeName: newConfig.businessName,
+      logoUrl: newConfig.logoUrl,
+      address: newConfig.address,
+      phone: newConfig.phone,
+      instagram: newConfig.instagram,
+      isTaxEnabled: newConfig.isTaxEnabled,
+      isServiceEnabled: newConfig.isServiceEnabled,
+      taxRate: newConfig.taxRate,
+      serviceChargeRate: newConfig.serviceChargeRate,
+      receiptFooter: newConfig.receiptFooter,
+      orderNumberPrefix: newConfig.orderNumberPrefix,
+      defaultLowStockThreshold: newConfig.defaultLowStockThreshold,
+    );
+    await _configService.saveConfig(newConfig);
+    _receiptService.updatePrinterMode(newConfig.printerMode);
+    _telegramService = TelegramBotService(config: newConfig.telegramConfig);
+    notifyListeners();
+  }
+
+  // ==========================================
+  // INTEGRATION SERVICES: PAYMENT, PRINTER & TELEGRAM
+  // ==========================================
+  PaymentService createPaymentServiceForMethod(PaymentMethod method) {
+    if (method == PaymentMethod.qris) {
+      switch (_businessConfig.qrisConfig.paymentMode) {
+        case QrisPaymentMode.simulation:
+          return MockQrisPaymentService();
+        case QrisPaymentMode.staticQris:
+          return StaticQrisPaymentService(qrisConfig: _businessConfig.qrisConfig);
+        case QrisPaymentMode.realGateway:
+          return RealQrisPaymentService();
+      }
+    }
+    return MockPaymentService();
+  }
+
+  ReceiptData getOrderReceiptData(Order order) {
+    return _receiptService.buildReceiptData(order, _businessConfig);
+  }
+
+  Future<PrinterResult> printOrderReceipt(Order order) async {
+    return _receiptService.printOrderReceipt(order, _businessConfig);
+  }
+
+  Future<PrinterResult> reprintReceipt(String orderNumber) async {
+    return _receiptService.reprintReceipt(orderNumber);
+  }
+
+  Future<PrinterResult> testPrinter() async {
+    return _receiptService.printerService.testPrint();
+  }
+
+  Future<TelegramSendResult> sendTelegramDailyReport() async {
+    final now = DateTime.now();
+    final top = topSellingProducts;
+    final lowStockNames = [
+      ...lowStockProducts.map((p) => '${p.name} (stok: ${p.stock})'),
+      ...alertRawMaterials.map((m) => '${m.name} (stok: ${m.stock} ${m.unit.label})'),
+    ];
+
+    final reportData = DailyReportData(
+      date: now,
+      totalTransactions: todayTransactionsCount,
+      totalSales: todaySalesTotal,
+      cashSales: todayCashSales,
+      qrisSales: todayQrisSales,
+      debitSales: todayDebitSales,
+      topProducts: top,
+      lowStockItems: lowStockNames,
+      shiftReport: ShiftReportData(
+        shiftName: _currentShift.shiftName,
+        cashierName: _currentShift.cashierName,
+        startTime: _currentShift.startTime,
+        endTime: _currentShift.closedAt,
+        startingCash: _currentShift.startingCash,
+        expectedEndingCash: _currentShift.startingCash + todayCashSales,
+        actualEndingCash: _currentShift.actualEndingCash ?? (_currentShift.startingCash + todayCashSales),
+        variance: (_currentShift.actualEndingCash ?? (_currentShift.startingCash + todayCashSales)) -
+            (_currentShift.startingCash + todayCashSales),
+        cashSales: todayCashSales,
+        totalTransactions: todayTransactionsCount,
+        notes: _currentShift.closingNotes,
+      ),
+    );
+
+    return _telegramService.sendDailyReport(reportData);
+  }
+
+  Future<TelegramSendResult> sendTelegramShiftReport(ShiftInfo shift) async {
+    final cashSales = todayCashSales;
+    final expectedCash = shift.startingCash + cashSales;
+    final actualCash = shift.actualEndingCash ?? expectedCash;
+    final variance = actualCash - expectedCash;
+
+    final shiftData = ShiftReportData(
+      shiftName: shift.shiftName,
+      cashierName: shift.cashierName,
+      startTime: shift.startTime,
+      endTime: shift.closedAt,
+      startingCash: shift.startingCash,
+      expectedEndingCash: expectedCash,
+      actualEndingCash: actualCash,
+      variance: variance,
+      cashSales: cashSales,
+      totalTransactions: todayTransactionsCount,
+      notes: shift.closingNotes,
+    );
+
+    return _telegramService.sendShiftReport(shiftData);
+  }
+
+  Future<TelegramSendResult> sendTelegramLowStockAlert() async {
+    final items = <LowStockItemData>[];
+    for (final p in lowStockProducts) {
+      items.add(LowStockItemData(
+        name: p.name,
+        currentStock: p.stock,
+        minimumStock: _businessConfig.defaultLowStockThreshold,
+        unit: 'porsi',
+      ));
+    }
+    for (final m in alertRawMaterials) {
+      items.add(LowStockItemData(
+        name: m.name,
+        currentStock: m.stock,
+        minimumStock: m.minimumStock,
+        unit: m.unit.label,
+      ));
+    }
+    return _telegramService.sendLowStockAlert(items);
+  }
+
+  Future<TelegramSendResult> testTelegramConnection() async {
+    return _telegramService.testConnection();
   }
 
   // ==========================================
@@ -908,4 +1130,105 @@ class PosProvider extends ChangeNotifier {
     });
     return sorted.take(3).toList();
   }
+
+  // PERIOD-BASED FILTERING
+  // ==========================================
+  List<Order> _getOrdersInPeriod(DateTime start, DateTime end) {
+    return _orders.where((o) {
+      final orderDate = DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
+      final startDate = DateTime(start.year, start.month, start.day);
+      final endDate = DateTime(end.year, end.month, end.day);
+      return orderDate.isAtSameMomentAs(startDate) ||
+          (orderDate.isAfter(startDate) && orderDate.isBefore(endDate)) ||
+          orderDate.isAtSameMomentAs(endDate);
+    }).toList();
+  }
+
+  List<Order> getOrdersForPeriod(ReportPeriod period) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    switch (period) {
+      case ReportPeriod.today:
+        return _getOrdersInPeriod(today, today);
+      case ReportPeriod.last7Days:
+        final sevenDaysAgo = today.subtract(const Duration(days: 7));
+        return _getOrdersInPeriod(sevenDaysAgo, today);
+      case ReportPeriod.last30Days:
+        final thirtyDaysAgo = today.subtract(const Duration(days: 30));
+        return _getOrdersInPeriod(thirtyDaysAgo, today);
+    }
+  }
+
+  int getSalesTotalForPeriod(ReportPeriod period) {
+    final orders = getOrdersForPeriod(period);
+    return orders.where((o) => o.status == OrderStatus.paid).fold<int>(0, (sum, o) => sum + o.grandTotal);
+  }
+
+  int getTransactionsCountForPeriod(ReportPeriod period) {
+    final orders = getOrdersForPeriod(period);
+    return orders.where((o) => o.status == OrderStatus.paid).length;
+  }
+
+  int getAverageTransactionForPeriod(ReportPeriod period) {
+    final count = getTransactionsCountForPeriod(period);
+    final total = getSalesTotalForPeriod(period);
+    return count > 0 ? (total / count).round() : 0;
+  }
+
+  int getTotalItemsSoldForPeriod(ReportPeriod period) {
+    final orders = getOrdersForPeriod(period);
+    int total = 0;
+    for (final order in orders) {
+      if (order.status == OrderStatus.paid) {
+        for (final item in order.items) {
+          total += item.quantity;
+        }
+      }
+    }
+    return total;
+  }
+
+  Map<String, int> getProductSalesCountsForPeriod(ReportPeriod period) {
+    final orders = getOrdersForPeriod(period);
+    final map = <String, int>{};
+    for (final order in orders) {
+      if (order.status == OrderStatus.paid) {
+        for (final item in order.items) {
+          map[item.product.name] = (map[item.product.name] ?? 0) + item.quantity;
+        }
+      }
+    }
+    return map;
+  }
+
+  List<MapEntry<String, int>> getTopSellingProductsForPeriod(ReportPeriod period) {
+    final counts = getProductSalesCountsForPeriod(period).entries.toList();
+    counts.sort((a, b) => b.value.compareTo(a.value));
+    return counts;
+  }
+
+  int getCashSalesForPeriod(ReportPeriod period) {
+    final orders = getOrdersForPeriod(period);
+    return orders.where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.cash)
+        .fold<int>(0, (sum, o) => sum + o.grandTotal);
+  }
+
+  int getQrisSalesForPeriod(ReportPeriod period) {
+    final orders = getOrdersForPeriod(period);
+    return orders.where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.qris)
+        .fold<int>(0, (sum, o) => sum + o.grandTotal);
+  }
+
+  int getDebitSalesForPeriod(ReportPeriod period) {
+    final orders = getOrdersForPeriod(period);
+    return orders.where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.debitCard)
+        .fold<int>(0, (sum, o) => sum + o.grandTotal);
+  }
+
+  List<Order> getPaidOrdersForPeriod(ReportPeriod period) {
+    final orders = getOrdersForPeriod(period);
+    return orders.where((o) => o.status == OrderStatus.paid).toList();
+  }
 }
+
+enum ReportPeriod { today, last7Days, last30Days }

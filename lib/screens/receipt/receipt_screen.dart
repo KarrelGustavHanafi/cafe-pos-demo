@@ -23,7 +23,54 @@ class ReceiptScreen extends StatefulWidget {
 }
 
 class _ReceiptScreenState extends State<ReceiptScreen> {
+  void _showPlainReceiptPreview(BuildContext context, Order order) {
+    final receiptData = widget.pos.getOrderReceiptData(order);
+    final plainText = widget.pos.receiptService.formatReceiptPlainText(receiptData);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
+            SizedBox(width: 8),
+            Text('Pratinjau Struk 80mm (Monospace)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: Container(
+          width: 420,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              plainText,
+              style: const TextStyle(
+                fontFamily: 'Courier',
+                color: Color(0xFFE0E0E0),
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showPrintSimulationDialog(BuildContext context, Order order) {
+    final printer = widget.pos.printerService;
+    final config = widget.pos.businessConfig;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -43,17 +90,17 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
               child: const Icon(Icons.print_rounded, color: AppColors.primaryDark, size: 20),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'SIMULASI CETAK STRUK',
+                  const Text(
+                    'PENCETAKAN STRUK KASIR',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8),
                   ),
                   Text(
-                    'Thermal POS Printer (ESC/POS)',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                    'Mode: ${config.printerMode.label} (${config.printerWidth.label})',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -73,22 +120,31 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
               ),
               child: Column(
                 children: [
-                  _buildPrinterRow('Printer:', 'CAFFE POS Thermal 80mm', isBold: true),
+                  _buildPrinterRow('Printer:', '${config.businessName} Thermal ${config.printerWidth.label}', isBold: true),
                   const SizedBox(height: 6),
-                  _buildPrinterStatusRow('Status:', 'Siap digunakan'),
+                  _buildPrinterStatusRow('Status:', printer.connectionState.label),
                   const SizedBox(height: 6),
-                  _buildPrinterRow('Ukuran:', '80 mm (Kertas Kasir)'),
+                  _buildPrinterRow('Ukuran Kertas:', '${config.printerWidth.label} (Thermal Roll)'),
                   const SizedBox(height: 6),
-                  _buildPrinterRow('Jumlah:', '1 copy (Struk Pembeli)'),
+                  _buildPrinterRow('Mode Adapter:', config.printerMode.label),
                   const SizedBox(height: 6),
                   _buildPrinterRow('No. Pesanan:', order.orderNumber),
                 ],
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Catatan: Ini adalah demonstrasi alur pencetakan struk kasir Bluetooth/USB.',
-              style: TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showPlainReceiptPreview(context, order);
+                  },
+                  icon: const Icon(Icons.code_rounded, size: 15),
+                  label: const Text('Lihat Format ESC/POS 80mm', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
+              ],
             ),
           ],
         ),
@@ -98,26 +154,33 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton.icon(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '✓ Simulasi cetak berhasil: Struk ${order.orderNumber} terkirim ke printer thermal 80mm.',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+              final result = await widget.pos.printOrderReceipt(order);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(
+                          result.success ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                          color: Colors.white,
+                          size: 18,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            result.message,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: result.success ? AppColors.primaryDark : AppColors.danger,
+                    duration: const Duration(seconds: 3),
                   ),
-                  backgroundColor: AppColors.primaryDark,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
+                );
+              }
             },
             icon: const Icon(Icons.print_rounded, size: 16),
             label: const Text('Cetak Sekarang', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -334,6 +397,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
               ReceiptWidget(
                 order: order,
                 maxWidth: isMobile ? 340 : 360,
+                businessConfig: widget.pos.businessConfig,
               ),
 
               const SizedBox(height: 18),

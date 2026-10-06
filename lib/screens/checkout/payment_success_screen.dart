@@ -41,7 +41,7 @@ class PaymentSuccessScreen extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 500),
             child: Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.dialog)),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
                 child: Column(

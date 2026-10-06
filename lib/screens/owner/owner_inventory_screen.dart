@@ -39,6 +39,39 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
 
   // Tab 4: History state
   String _historyFilter = 'all'; // 'all', 'materials', 'products'
+  bool _isSendingTelegramAlert = false;
+
+  void _sendTelegramStockAlert() async {
+    setState(() => _isSendingTelegramAlert = true);
+    final res = await widget.pos.sendTelegramLowStockAlert();
+    if (!mounted) return;
+    setState(() => _isSendingTelegramAlert = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              res.success ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(res.message, style: const TextStyle(fontWeight: FontWeight.w600))),
+          ],
+        ),
+        backgroundColor: res.success ? AppColors.primaryDark : AppColors.danger,
+        duration: const Duration(seconds: 4),
+        action: res.success
+            ? null
+            : SnackBarAction(
+                label: 'Coba Lagi',
+                textColor: Colors.white,
+                onPressed: _sendTelegramStockAlert,
+              ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -192,10 +225,35 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
         title: Semantics(
           header: true,
           headingLevel: 1,
-          child: const Text('Inventaris & Stok'),
+          child: const Text('Inventaris'),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ElevatedButton.icon(
+              onPressed: _isSendingTelegramAlert ? null : _sendTelegramStockAlert,
+              icon: _isSendingTelegramAlert
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.notifications_active_rounded, size: 14),
+              label: Text(
+                _isSendingTelegramAlert ? 'Mengirim...' : (isMobile ? 'Alert Stok' : 'Kirim Alert ke Telegram'),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0088CC),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                minimumSize: const Size(0, 36),
+              ),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(68),
+          preferredSize: const Size.fromHeight(62),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -204,7 +262,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    'Pantau ketersediaan bahan dan produk untuk operasional cafe.',
+                    'Pantau stok menu dan bahan baku cafe.',
                     style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                   ),
                 ),
@@ -342,78 +400,81 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
             },
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Search & Filter Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: 40,
-                    child: TextField(
-                      controller: _menuSearchController,
-                      onChanged: (v) => setState(() => _menuSearchQuery = v),
-                      decoration: const InputDecoration(
-                        hintText: 'Cari menu atau SKU...',
-                        prefixIcon: Icon(Icons.search_rounded, size: 18),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+          // Search & Filter Panel
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppRadius.roundedMd,
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 38,
+                  child: TextField(
+                    controller: _menuSearchController,
+                    onChanged: (v) => setState(() => _menuSearchQuery = v),
+                    decoration: const InputDecoration(
+                      hintText: 'Cari menu...',
+                      prefixIcon: Icon(Icons.search_rounded, size: 18),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: const Text('Semua Status', style: TextStyle(fontSize: 11)),
+                        selected: _menuStatusFilter == null,
+                        onSelected: (_) => setState(() => _menuStatusFilter = null),
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      FilterChip(
+                        label: const Text('IN STOCK', style: TextStyle(fontSize: 11)),
+                        selected: _menuStatusFilter == StockStatus.inStock,
+                        selectedColor: AppColors.successSoft,
+                        onSelected: (_) => setState(() => _menuStatusFilter = StockStatus.inStock),
+                      ),
+                      const SizedBox(width: 6),
+                      FilterChip(
+                        label: const Text('LOW STOCK', style: TextStyle(fontSize: 11)),
+                        selected: _menuStatusFilter == StockStatus.lowStock,
+                        selectedColor: AppColors.warningSoft,
+                        onSelected: (_) => setState(() => _menuStatusFilter = StockStatus.lowStock),
+                      ),
+                      const SizedBox(width: 6),
+                      FilterChip(
+                        label: const Text('OUT OF STOCK', style: TextStyle(fontSize: 11)),
+                        selected: _menuStatusFilter == StockStatus.outOfStock,
+                        selectedColor: AppColors.errorSoft,
+                        onSelected: (_) => setState(() => _menuStatusFilter = StockStatus.outOfStock),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        FilterChip(
-                          label: const Text('Semua Status', style: TextStyle(fontSize: 11)),
-                          selected: _menuStatusFilter == null,
-                          onSelected: (_) => setState(() => _menuStatusFilter = null),
+                ),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ProductCategory.values.map((cat) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: FilterChip(
+                          label: Text(cat.label, style: const TextStyle(fontSize: 11)),
+                          selected: _menuCategoryFilter == cat,
+                          onSelected: (_) => setState(() => _menuCategoryFilter = cat),
                         ),
-                        const SizedBox(width: 6),
-                        FilterChip(
-                          label: const Text('IN STOCK', style: TextStyle(fontSize: 11)),
-                          selected: _menuStatusFilter == StockStatus.inStock,
-                          selectedColor: AppColors.successSoft,
-                          onSelected: (_) => setState(() => _menuStatusFilter = StockStatus.inStock),
-                        ),
-                        const SizedBox(width: 6),
-                        FilterChip(
-                          label: const Text('LOW STOCK', style: TextStyle(fontSize: 11)),
-                          selected: _menuStatusFilter == StockStatus.lowStock,
-                          selectedColor: AppColors.warningSoft,
-                          onSelected: (_) => setState(() => _menuStatusFilter = StockStatus.lowStock),
-                        ),
-                        const SizedBox(width: 6),
-                        FilterChip(
-                          label: const Text('OUT OF STOCK', style: TextStyle(fontSize: 11)),
-                          selected: _menuStatusFilter == StockStatus.outOfStock,
-                          selectedColor: AppColors.errorSoft,
-                          onSelected: (_) => setState(() => _menuStatusFilter = StockStatus.outOfStock),
-                        ),
-                      ],
-                    ),
+                      );
+                    }).toList(),
                   ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: ProductCategory.values.map((cat) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: FilterChip(
-                            label: Text(cat.label, style: const TextStyle(fontSize: 11)),
-                            selected: _menuCategoryFilter == cat,
-                            onSelected: (_) => setState(() => _menuCategoryFilter = cat),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
 
@@ -757,101 +818,104 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
             },
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Search, Filter & Action Row
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 40,
-                          child: TextField(
-                            controller: _matSearchController,
-                            onChanged: (v) => setState(() => _matSearchQuery = v),
-                            decoration: const InputDecoration(
-                              hintText: 'Cari nama bahan baku (contoh: Coffee Beans, Palm Sugar)...',
-                              prefixIcon: Icon(Icons.search_rounded, size: 18),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                            ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppRadius.roundedMd,
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: TextField(
+                          controller: _matSearchController,
+                          onChanged: (v) => setState(() => _matSearchQuery = v),
+                          decoration: const InputDecoration(
+                            hintText: 'Cari bahan...',
+                            prefixIcon: Icon(Icons.search_rounded, size: 18),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      ElevatedButton.icon(
-                        onPressed: () => _openRawMaterialForm(),
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: const Text('Tambah Bahan'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                        ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => _openRawMaterialForm(),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Tambah Bahan'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: const Text('Semua Status', style: TextStyle(fontSize: 11)),
+                        selected: _matStatusFilter == null,
+                        onSelected: (_) => setState(() => _matStatusFilter = null),
+                      ),
+                      const SizedBox(width: 6),
+                      FilterChip(
+                        label: const Text('IN STOCK', style: TextStyle(fontSize: 11)),
+                        selected: _matStatusFilter == StockStatus.inStock,
+                        selectedColor: AppColors.successSoft,
+                        onSelected: (_) => setState(() => _matStatusFilter = StockStatus.inStock),
+                      ),
+                      const SizedBox(width: 6),
+                      FilterChip(
+                        label: const Text('LOW STOCK', style: TextStyle(fontSize: 11)),
+                        selected: _matStatusFilter == StockStatus.lowStock,
+                        selectedColor: AppColors.warningSoft,
+                        onSelected: (_) => setState(() => _matStatusFilter = StockStatus.lowStock),
+                      ),
+                      const SizedBox(width: 6),
+                      FilterChip(
+                        label: const Text('OUT OF STOCK', style: TextStyle(fontSize: 11)),
+                        selected: _matStatusFilter == StockStatus.outOfStock,
+                        selectedColor: AppColors.errorSoft,
+                        onSelected: (_) => setState(() => _matStatusFilter = StockStatus.outOfStock),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        FilterChip(
-                          label: const Text('Semua Status', style: TextStyle(fontSize: 11)),
-                          selected: _matStatusFilter == null,
-                          onSelected: (_) => setState(() => _matStatusFilter = null),
-                        ),
-                        const SizedBox(width: 6),
-                        FilterChip(
-                          label: const Text('IN STOCK', style: TextStyle(fontSize: 11)),
-                          selected: _matStatusFilter == StockStatus.inStock,
-                          selectedColor: AppColors.successSoft,
-                          onSelected: (_) => setState(() => _matStatusFilter = StockStatus.inStock),
-                        ),
-                        const SizedBox(width: 6),
-                        FilterChip(
-                          label: const Text('LOW STOCK', style: TextStyle(fontSize: 11)),
-                          selected: _matStatusFilter == StockStatus.lowStock,
-                          selectedColor: AppColors.warningSoft,
-                          onSelected: (_) => setState(() => _matStatusFilter = StockStatus.lowStock),
-                        ),
-                        const SizedBox(width: 6),
-                        FilterChip(
-                          label: const Text('OUT OF STOCK', style: TextStyle(fontSize: 11)),
-                          selected: _matStatusFilter == StockStatus.outOfStock,
-                          selectedColor: AppColors.errorSoft,
-                          onSelected: (_) => setState(() => _matStatusFilter = StockStatus.outOfStock),
-                        ),
-                      ],
-                    ),
+                ),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: const Text('Semua Kategori', style: TextStyle(fontSize: 11)),
+                        selected: _matCategoryFilter == null,
+                        onSelected: (_) => setState(() => _matCategoryFilter = null),
+                      ),
+                      ...RawMaterialCategory.values.map((cat) {
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: FilterChip(
+                            label: Text(cat.label, style: const TextStyle(fontSize: 11)),
+                            selected: _matCategoryFilter == cat,
+                            onSelected: (_) => setState(() => _matCategoryFilter = cat),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        FilterChip(
-                          label: const Text('Semua Kategori', style: TextStyle(fontSize: 11)),
-                          selected: _matCategoryFilter == null,
-                          onSelected: (_) => setState(() => _matCategoryFilter = null),
-                        ),
-                        ...RawMaterialCategory.values.map((cat) {
-                          return Padding(
-                            padding: const EdgeInsets.only(left: 6),
-                            child: FilterChip(
-                              label: Text(cat.label, style: const TextStyle(fontSize: 11)),
-                              selected: _matCategoryFilter == cat,
-                              onSelected: (_) => setState(() => _matCategoryFilter = cat),
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
 
@@ -1135,20 +1199,15 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
           const SizedBox(height: 16),
 
           // Search Bar
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: SizedBox(
-                height: 40,
-                child: TextField(
-                  controller: _recipeSearchController,
-                  onChanged: (v) => setState(() => _recipeSearchQuery = v),
-                  decoration: const InputDecoration(
-                    hintText: 'Cari menu untuk melihat/mengatur resep...',
-                    prefixIcon: Icon(Icons.search_rounded, size: 18),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                  ),
-                ),
+          SizedBox(
+            height: 42,
+            child: TextField(
+              controller: _recipeSearchController,
+              onChanged: (v) => setState(() => _recipeSearchQuery = v),
+              decoration: const InputDecoration(
+                hintText: 'Cari menu untuk melihat/mengatur resep...',
+                prefixIcon: Icon(Icons.search_rounded, size: 18),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12),
               ),
             ),
           ),

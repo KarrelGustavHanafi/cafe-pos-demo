@@ -110,50 +110,50 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     final isWide = screenWidth >= 640;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 720,
+          maxWidth: 700,
           maxHeight: MediaQuery.of(context).size.height * 0.9,
         ),
         child: Column(
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 16, 14),
+              padding: const EdgeInsets.fromLTRB(18, 16, 14, 12),
               child: Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: AppColors.primarySoft,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColors.primaryBorder),
                     ),
                     child: Icon(
                       isEdit ? Icons.edit_note_rounded : Icons.add_circle_outline_rounded,
                       color: AppColors.primary,
-                      size: 20,
+                      size: 18,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isEdit ? 'Edit Produk Menu' : 'Tambah Produk Baru',
+                          isEdit ? 'Edit Produk' : 'Tambah Produk',
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.w800,
                             color: AppColors.textPrimary,
                           ),
                         ),
                         Text(
                           isEdit
-                              ? 'Ubah informasi harga, kategori, dan stok produk'
-                              : 'Masukkan data produk baru untuk katalog menu',
+                              ? 'Ubah informasi harga, kategori, dan stok'
+                              : 'Masukkan data produk baru',
                           style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                         ),
                       ],
@@ -171,7 +171,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                       ),
                     ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
+                    icon: const Icon(Icons.close_rounded, size: 18),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -183,7 +183,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
             // Form Body
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(18),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -191,7 +191,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                     children: [
                       // Section 1: Image & Visual Presentation
                       const Text(
-                        'Foto & Visual Produk',
+                        'Foto Produk',
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 8),
@@ -201,11 +201,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                         children: [
                           // Live Image Preview
                           Container(
-                            width: 100,
-                            height: 85,
+                            width: 90,
+                            height: 80,
                             decoration: BoxDecoration(
                               color: AppColors.surfaceSubtle,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: AppColors.border),
                             ),
                             clipBehavior: Clip.antiAlias,
@@ -221,7 +221,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                     child: Icon(Icons.image_outlined, color: AppColors.textMuted),
                                   ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           // Image URL input & quick presets
                           Expanded(
                             child: Column(
@@ -231,15 +231,15 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                   controller: _imageUrlController,
                                   onChanged: (_) => setState(() {}),
                                   decoration: const InputDecoration(
-                                    labelText: 'URL Foto Produk (Unsplash / CDN)',
+                                    labelText: 'URL Foto',
                                     hintText: 'https://images.unsplash.com/...',
                                     prefixIcon: Icon(Icons.link_rounded, size: 18),
                                     contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
                                 const Text(
-                                  'Pilihan Foto Menu Cepat (Klik untuk memilih):',
+                                  'Pilihan Foto Cepat:',
                                   style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
                                 ),
                                 const SizedBox(height: 4),
@@ -273,9 +273,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                         ],
                       ),
 
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
                       const Divider(height: 1, color: AppColors.borderLight),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
 
                       // Section 2: General Info
                       if (isWide)
@@ -293,7 +293,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               flex: 2,
                               child: DropdownButtonFormField<ProductCategory>(
@@ -326,7 +326,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                             prefixIcon: Icon(Icons.fastfood_outlined, size: 18),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         DropdownButtonFormField<ProductCategory>(
                           initialValue: _category,
                           decoration: const InputDecoration(
@@ -346,20 +346,22 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                         ),
                       ],
 
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
 
                       // Description
                       TextFormField(
                         controller: _descController,
                         maxLines: 2,
                         decoration: const InputDecoration(
-                          labelText: 'Deskripsi Produk',
+                          labelText: 'Deskripsi',
                           hintText: 'Perpaduan puree stroberi segar dengan ceremonial matcha dan susu dingin',
                           prefixIcon: Icon(Icons.description_outlined, size: 18),
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: AppColors.borderLight),
+                      const SizedBox(height: 12),
 
                       // Section 3: Pricing & Cost
                       if (isWide)
@@ -377,24 +379,24 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: TextFormField(
                                 controller: _costPriceController,
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
-                                  labelText: 'Harga Pokok / HPP (Rp)',
+                                  labelText: 'HPP (Rp)',
                                   prefixText: 'Rp ',
                                   prefixIcon: Icon(Icons.receipt_long_outlined, size: 18),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: TextFormField(
                                 controller: _skuController,
                                 decoration: const InputDecoration(
-                                  labelText: 'Kode / SKU',
+                                  labelText: 'SKU',
                                   hintText: 'Contoh: NC-STM-08',
                                   prefixIcon: Icon(Icons.qr_code_2_rounded, size: 18),
                                 ),
@@ -413,28 +415,30 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                             prefixIcon: Icon(Icons.payments_outlined, size: 18),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         TextFormField(
                           controller: _costPriceController,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Harga Pokok / HPP (Rp)',
+                            labelText: 'HPP (Rp)',
                             prefixText: 'Rp ',
                             prefixIcon: Icon(Icons.receipt_long_outlined, size: 18),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         TextFormField(
                           controller: _skuController,
                           decoration: const InputDecoration(
-                            labelText: 'Kode / SKU',
+                            labelText: 'SKU',
                             hintText: 'Contoh: NC-STM-08',
                             prefixIcon: Icon(Icons.qr_code_2_rounded, size: 18),
                           ),
                         ),
                       ],
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: AppColors.borderLight),
+                      const SizedBox(height: 12),
 
                       // Section 4: Stock & Threshold & Status
                       if (isWide)
@@ -446,39 +450,39 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                 keyboardType: TextInputType.number,
                                 validator: (v) => v == null || v.trim().isEmpty ? 'Stok wajib diisi' : null,
                                 decoration: const InputDecoration(
-                                  labelText: 'Stok Awal / Saat Ini *',
+                                  labelText: 'Stok *',
                                   suffixText: 'unit',
                                   prefixIcon: Icon(Icons.inventory_2_outlined, size: 18),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: TextFormField(
                                 controller: _thresholdController,
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
-                                  labelText: 'Batas Stok Rendah (Threshold)',
+                                  labelText: 'Batas Rendah',
                                   suffixText: 'unit',
                                   prefixIcon: Icon(Icons.warning_amber_rounded, size: 18),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Container(
-                                height: 48,
+                                height: 44,
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
                                 decoration: BoxDecoration(
                                   color: AppColors.surfaceSubtle,
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: AppColors.border),
                                 ),
                                 child: Row(
                                   children: [
                                     const Expanded(
                                       child: Text(
-                                        'Status Menu:',
+                                        'Status:',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -502,35 +506,35 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                           keyboardType: TextInputType.number,
                           validator: (v) => v == null || v.trim().isEmpty ? 'Stok wajib diisi' : null,
                           decoration: const InputDecoration(
-                            labelText: 'Stok Awal / Saat Ini *',
+                            labelText: 'Stok *',
                             suffixText: 'unit',
                             prefixIcon: Icon(Icons.inventory_2_outlined, size: 18),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         TextFormField(
                           controller: _thresholdController,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Batas Stok Rendah (Threshold)',
+                            labelText: 'Batas Rendah',
                             suffixText: 'unit',
                             prefixIcon: Icon(Icons.warning_amber_rounded, size: 18),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceSubtle,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: AppColors.border),
                           ),
                           child: Row(
                             children: [
                               Expanded(
                                 child: Text(
-                                  _isActive ? 'Status: Aktif (Tersedia)' : 'Status: Nonaktif (Disembunyikan)',
-                                  maxLines: 2,
+                                  _isActive ? 'Status: Aktif' : 'Status: Nonaktif',
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
@@ -548,7 +552,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
 
                       // Section 5: Resep & Komposisi Bahan Baku (Priority 1 UX Discovery)
                       if (isEdit && widget.onManageRecipe != null) ...[
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 14),
+                        const Divider(height: 1, color: AppColors.borderLight),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
                             const Text(
@@ -563,7 +569,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                             if (widget.currentRecipe != null &&
                                 widget.currentRecipe!.items.isNotEmpty)
                               ShadcnBadge(
-                                label: '${widget.currentRecipe!.items.length} Bahan Baku',
+                                label: '${widget.currentRecipe!.items.length} Bahan',
                                 variant: ShadBadgeVariant.success,
                                 showDot: true,
                               )
@@ -576,26 +582,26 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                         ),
                         const SizedBox(height: 8),
                         ShadcnCard(
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.all(12),
                           backgroundColor: AppColors.surfaceSubtle,
                           borderColor: AppColors.border,
                           child: Row(
                             children: [
                               Container(
-                                width: 40,
-                                height: 40,
+                                width: 36,
+                                height: 36,
                                 decoration: BoxDecoration(
                                   color: AppColors.primarySoft,
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: AppColors.primaryBorder),
                                 ),
                                 child: const Icon(
                                   Icons.menu_book_rounded,
                                   color: AppColors.primary,
-                                  size: 20,
+                                  size: 18,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,7 +609,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                     const Text(
                                       'Hubungkan Takaran Bahan Baku',
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.w700,
                                         color: AppColors.textPrimary,
                                       ),
@@ -616,7 +622,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                               .map((i) =>
                                                   '${i.materialName} (${i.quantity.toStringAsFixed(i.quantity.truncateToDouble() == i.quantity ? 0 : 1)} ${i.unit})')
                                               .join(', ')
-                                          : 'Atur resep agar bahan baku otomatis terpotong dari stok inventaris saat pesanan kasir.',
+                                          : 'Atur resep agar bahan baku otomatis terpotong dari stok.',
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -627,12 +633,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               ShadcnButton(
                                 variant: ShadButtonVariant.primary,
-                                height: 36,
+                                height: 34,
                                 icon: const Icon(Icons.tune_rounded, size: 14),
-                                text: 'Kelola Resep',
+                                text: 'Kelola',
                                 onPressed: widget.onManageRecipe,
                               ),
                             ],
@@ -647,13 +653,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
 
             const Divider(height: 1, color: AppColors.border),
 
-            // Footer Actions - Wrap so the three controls reflow on narrow
-            // dialogs instead of forcing a horizontal overflow.
+            // Footer Actions
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
               child: Wrap(
                 alignment: WrapAlignment.end,
-                spacing: 12,
+                spacing: 10,
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
@@ -661,7 +666,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                     TextButton.icon(
                       onPressed: widget.onDelete,
                       icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 16),
-                      label: const Text('Hapus Menu', maxLines: 1, style: TextStyle(color: AppColors.error)),
+                      label: const Text('Hapus', maxLines: 1, style: TextStyle(color: AppColors.error)),
                     ),
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -670,11 +675,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                   ElevatedButton.icon(
                     onPressed: _submit,
                     icon: const Icon(Icons.save_rounded, size: 16),
-                    label: Text(isEdit ? 'Simpan Perubahan' : 'Tambah Produk', maxLines: 1),
+                    label: Text(isEdit ? 'Simpan' : 'Tambah', maxLines: 1),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                     ),
                   ),
                 ],

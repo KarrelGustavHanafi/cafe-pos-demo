@@ -73,7 +73,11 @@ class OwnerDashboard extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: _buildDashboardTitle(),
+        title: Semantics(
+          header: true,
+          headingLevel: 1,
+          child: const Text('Dashboard'),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 14),
@@ -97,37 +101,37 @@ class OwnerDashboard extends StatelessWidget {
             const DemoGuideWidget(isCashierMode: false),
             const SizedBox(height: 4),
 
-            // Welcome & Live Shift Status Callout
+            // Live Shift Status Callout
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: AppColors.primarySoft,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColors.primaryBorder),
                     ),
-                    child: const Icon(Icons.insights_rounded, color: AppColors.primary, size: 24),
+                    child: const Icon(Icons.insights_rounded, color: AppColors.primary, size: 20),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Ringkasan Kinerja Kafe Hari Ini',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          'Ringkasan Operasional Hari Ini',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Shift Aktif: ${currentShift.shiftName} • Kasir: ${currentShift.cashierName} • Meja Terisi: ${pos.occupiedTablesCount} Meja',
+                          'Shift: ${currentShift.shiftName} • Kasir: ${currentShift.cashierName} • Meja Terisi: ${pos.occupiedTablesCount}',
                           style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                         ),
                       ],
@@ -142,11 +146,11 @@ class OwnerDashboard extends StatelessWidget {
             // Combined Inventory Alert Banner (Menu & Raw Materials)
             if (lowStockItems.isNotEmpty || pos.alertRawMaterials.isNotEmpty)
               Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: pos.outOfStockRawMaterials.isNotEmpty ? AppColors.errorSoft : AppColors.warningSoft,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: (pos.outOfStockRawMaterials.isNotEmpty ? AppColors.error : AppColors.warning).withValues(alpha: 0.3),
                   ),
@@ -160,14 +164,15 @@ class OwnerDashboard extends StatelessWidget {
                         children: [
                           Text(
                             pos.outOfStockRawMaterials.isNotEmpty
-                                ? 'Peringatan Bahan Habis & Menipis (${pos.alertRawMaterials.length} Bahan, ${lowStockItems.length} Menu)'
-                                : 'Peringatan Stok Menipis (${pos.lowStockRawMaterials.length} Bahan, ${lowStockItems.length} Menu)',
+                                ? 'Peringatan: ${pos.alertRawMaterials.length} Bahan, ${lowStockItems.length} Menu Perlu Perhatian'
+                                : 'Peringatan: ${pos.lowStockRawMaterials.length} Bahan, ${lowStockItems.length} Menu Stok Menipis',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
                               color: pos.outOfStockRawMaterials.isNotEmpty ? AppColors.error : AppColors.warning,
                             ),
                           ),
+                          const SizedBox(height: 2),
                           Text(
                             [
                               if (pos.outOfStockRawMaterials.isNotEmpty)
@@ -194,9 +199,9 @@ class OwnerDashboard extends StatelessWidget {
                               Icon(
                                 pos.outOfStockRawMaterials.isNotEmpty ? Icons.error_outline_rounded : Icons.warning_amber_rounded,
                                 color: pos.outOfStockRawMaterials.isNotEmpty ? AppColors.error : AppColors.warning,
-                                size: 22,
+                                size: 20,
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               content,
                             ],
                           ),
@@ -206,7 +211,7 @@ class OwnerDashboard extends StatelessWidget {
                               child: TextButton(
                                 onPressed: onViewInventory,
                                 style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                                child: const Text('Buka Inventaris', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                                child: const Text('Kelola Inventaris', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
                               ),
                             ),
                         ],
@@ -218,20 +223,22 @@ class OwnerDashboard extends StatelessWidget {
                         Icon(
                           pos.outOfStockRawMaterials.isNotEmpty ? Icons.error_outline_rounded : Icons.warning_amber_rounded,
                           color: pos.outOfStockRawMaterials.isNotEmpty ? AppColors.error : AppColors.warning,
-                          size: 22,
+                          size: 20,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         content,
                         if (onViewInventory != null)
                           TextButton(
                             onPressed: onViewInventory,
-                            child: const Text('Buka Inventaris', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                            child: const Text('Kelola Inventaris', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
                           ),
                       ],
                     );
                   },
                 ),
               ),
+
+            const SizedBox(height: 14),
 
             // 1. TODAY'S PRIMARY METRICS GRID
             LayoutBuilder(
@@ -288,127 +295,112 @@ class OwnerDashboard extends StatelessWidget {
               },
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
-            // 1.5 SALES TREND CHART (Hourly breakdown from mock orders)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+            // 2. MIDDLE EDITORIAL SECTION: Trend & Payment Channels
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 840;
+
+                final trendCard = Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.show_chart_rounded, color: AppColors.primary, size: 18),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tren Penjualan Hari Ini (per Jam)',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                              ),
-                              Text(
-                                'Visualisasi transaksi berdasarkan jam operasional',
-                                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    SalesBarChart(
-                      height: 110,
-                      data: _buildHourlyChartData(recentOrders),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // 2. PAYMENT CHANNELS ROW (Cash, QRIS, Other)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Penerimaan Pembayaran Hari Ini',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                    ),
-                    const SizedBox(height: 12),
-                    LayoutBuilder(
-                      builder: (context, payConstraints) {
-                        final isNarrow = payConstraints.maxWidth < 520;
-                        if (isNarrow) {
-                          return Column(
-                            children: [
-                              _buildPaymentTile(
-                                'QRIS Revenue',
-                                AppCurrency.format(qrisSales),
-                                Icons.qr_code_rounded,
-                                AppColors.primary,
-                              ),
-                              const SizedBox(height: 8),
-                              _buildPaymentTile(
-                                'Tunai (Cash)',
-                                AppCurrency.format(cashSales),
-                                Icons.payments_rounded,
-                                AppColors.accentCaramel,
-                              ),
-                              const SizedBox(height: 8),
-                              _buildPaymentTile(
-                                'Debit / EDC',
-                                AppCurrency.format(debitSales),
-                                Icons.credit_card_rounded,
-                                AppColors.textSecondary,
-                              ),
-                            ],
-                          );
-                        }
-                        return Row(
+                        const Row(
                           children: [
+                            Icon(Icons.show_chart_rounded, color: AppColors.primary, size: 18),
+                            SizedBox(width: 8),
                             Expanded(
-                              child: _buildPaymentTile(
-                                'QRIS Revenue',
-                                AppCurrency.format(qrisSales),
-                                Icons.qr_code_rounded,
-                                AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildPaymentTile(
-                                'Tunai (Cash)',
-                                AppCurrency.format(cashSales),
-                                Icons.payments_rounded,
-                                AppColors.accentCaramel,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildPaymentTile(
-                                'Debit / EDC',
-                                AppCurrency.format(debitSales),
-                                Icons.credit_card_rounded,
-                                AppColors.textSecondary,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Tren Penjualan Hari Ini (per Jam)',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                                  ),
+                                  Text(
+                                    'Visualisasi transaksi berdasarkan jam operasional',
+                                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 12),
+                        SalesBarChart(
+                          height: 110,
+                          data: _buildHourlyChartData(recentOrders),
+                        ),
+                      ],
                     ),
+                  ),
+                );
+
+                final paymentCard = Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Penerimaan Pembayaran Hari Ini',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                        ),
+                        const SizedBox(height: 10),
+                        Column(
+                          children: [
+                            _buildPaymentTile(
+                              'QRIS',
+                              AppCurrency.format(qrisSales),
+                              Icons.qr_code_rounded,
+                              AppColors.primary,
+                            ),
+                            const SizedBox(height: 6),
+                            _buildPaymentTile(
+                              'Tunai',
+                              AppCurrency.format(cashSales),
+                              Icons.payments_rounded,
+                              AppColors.accentCaramel,
+                            ),
+                            const SizedBox(height: 6),
+                            _buildPaymentTile(
+                              'Debit / EDC',
+                              AppCurrency.format(debitSales),
+                              Icons.credit_card_rounded,
+                              AppColors.textSecondary,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+
+                if (isWide) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 7, child: trendCard),
+                      const SizedBox(width: 14),
+                      Expanded(flex: 5, child: paymentCard),
+                    ],
+                  );
+                }
+
+                return Column(
+                  children: [
+                    trendCard,
+                    const SizedBox(height: 14),
+                    paymentCard,
                   ],
-                ),
-              ),
+                );
+              },
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // 3. BUSINESS INSIGHTS: TOP PRODUCTS, LOWEST, & LOW STOCK
             LayoutBuilder(
@@ -442,7 +434,7 @@ class OwnerDashboard extends StatelessWidget {
               },
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // 4. RECENT ORDERS & ACTIVE SHIFTS
             Card(
@@ -467,7 +459,7 @@ class OwnerDashboard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     const Divider(height: 1, color: AppColors.border),
                     if (recentOrders.isEmpty)
                       const Padding(
@@ -524,25 +516,6 @@ class OwnerDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildDashboardTitle() {
-    final hour = DateTime.now().hour;
-    String greeting;
-    if (hour < 11) {
-      greeting = '☀️ Selamat Pagi, Owner';
-    } else if (hour < 15) {
-      greeting = '🌤 Selamat Siang, Owner';
-    } else if (hour < 18) {
-      greeting = '🌆 Selamat Sore, Owner';
-    } else {
-      greeting = '🌙 Selamat Malam, Owner';
-    }
-    return Semantics(
-      header: true,
-      headingLevel: 1,
-      child: Text(greeting),
-    );
-  }
-
   /// Builds curated hourly chart data combining real orders + realistic demo baseline.
   List<SalesBarData> _buildHourlyChartData(List<Order> orders) {
     // Curated baseline representing a typical cafe day (8am-10pm)
@@ -578,10 +551,10 @@ class OwnerDashboard extends StatelessWidget {
 
   Widget _buildPaymentTile(String title, String amount, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppColors.surfaceSubtle,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.borderLight),
       ),
       child: Column(
@@ -589,7 +562,7 @@ class OwnerDashboard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: color),
+              Icon(icon, size: 15, color: color),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -600,10 +573,10 @@ class OwnerDashboard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             amount,
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color),
           ),
         ],
       ),

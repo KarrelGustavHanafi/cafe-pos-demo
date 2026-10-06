@@ -83,15 +83,15 @@ class ShadcnCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: backgroundColor ?? AppColors.surface,
-        borderRadius: AppRadius.roundedLg,
+        borderRadius: AppRadius.roundedCard,
         border: Border.all(
           color: borderColor ?? AppColors.border,
           width: 1.0,
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 4,
+            color: Color(0x05000000),
+            blurRadius: 3,
             offset: Offset(0, 1),
           ),
         ],
@@ -102,10 +102,10 @@ class ShadcnCard extends StatelessWidget {
     if (onTap != null || isInteractive) {
       return Material(
         color: Colors.transparent,
-        borderRadius: AppRadius.roundedLg,
+        borderRadius: AppRadius.roundedCard,
         child: InkWell(
           onTap: onTap,
-          borderRadius: AppRadius.roundedLg,
+          borderRadius: AppRadius.roundedCard,
           hoverColor: AppColors.primarySoft.withValues(alpha: 0.5),
           splashColor: AppColors.primarySoft,
           child: cardContent,
