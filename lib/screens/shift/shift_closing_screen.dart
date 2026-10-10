@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../models/business_config.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -23,9 +24,6 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
   final _actualCashController = TextEditingController();
   final _notesController = TextEditingController();
   int _actualCash = 0;
-  bool _isSendingTelegram = false;
-  bool _telegramSentSuccess = false;
-  String? _telegramErrorMessage;
 
   @override
   void initState() {
@@ -273,15 +271,40 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
                       SizedBox(
                         height: 46,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            widget.pos.closeShift(
+                          onPressed: () async {
+                            final result = await widget.pos.closeShift(
                               actualEndingCash: _actualCash,
                               notes: _notesController.text,
                             );
+                            if (!context.mounted) return;
+
+                            final telegramConfig = widget.pos.businessConfig.telegramConfig;
+                            final bool isSimulated = telegramConfig.integrationMode == TelegramIntegrationMode.mockSimulation ||
+                                (widget.pos.businessConfig.isPublicDemo &&
+                                    telegramConfig.integrationMode == TelegramIntegrationMode.directBotApi);
+
+                            String feedbackText;
+                            Color feedbackColor = AppColors.primaryDark;
+
+                            if (!telegramConfig.enabled) {
+                              feedbackText = 'Shift berhasil ditutup.';
+                            } else if (result != null && result.success) {
+                              if (isSimulated) {
+                                feedbackText = 'Shift berhasil ditutup. Laporan shift disimulasikan (Mock Telegram).';
+                              } else {
+                                feedbackText = 'Shift berhasil ditutup. Laporan berhasil dikirim ke Telegram.';
+                              }
+                            } else if (result != null && !result.success) {
+                              feedbackText = 'Shift berhasil ditutup, tetapi notifikasi Telegram gagal: ${result.message}';
+                              feedbackColor = AppColors.warning;
+                            } else {
+                              feedbackText = 'Shift berhasil ditutup.';
+                            }
+
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Shift berhasil ditutup dan laporan diserahkan.'),
-                                backgroundColor: AppColors.primaryDark,
+                              SnackBar(
+                                content: Text(feedbackText),
+                                backgroundColor: feedbackColor,
                               ),
                             );
                           },
@@ -313,158 +336,6 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
                               'Shift kasir telah resmi diselesaikan.\nWaktu Penutupan: ${timeFormat.format(shift.closedAt ?? DateTime.now())}',
                               textAlign: TextAlign.center,
                               style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.4),
-                            ),
-                            const SizedBox(height: 14),
-
-                            // Telegram Shift Report Trigger
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primarySoft,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: const Icon(Icons.send_rounded, color: AppColors.primaryDark, size: 16),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'Laporan Penutupan Shift ke Telegram',
-                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-                                            ),
-                                            Text(
-                                              'Target: ${widget.pos.businessConfig.telegramConfig.botUsername} (${widget.pos.businessConfig.telegramConfig.chatId})',
-                                              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  if (_telegramSentSuccess)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.successSoft,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.check_circle_rounded, color: AppColors.success, size: 14),
-                                          SizedBox(width: 6),
-                                          Text(
-                                            'Laporan shift berhasil terkirim ke Telegram',
-                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.success),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  else if (_telegramErrorMessage != null) ...[
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.dangerSoft,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 14),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              _telegramErrorMessage!,
-                                              style: const TextStyle(fontSize: 10.5, color: AppColors.danger, fontWeight: FontWeight.w600),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 36,
-                                      child: OutlinedButton.icon(
-                                        onPressed: _isSendingTelegram
-                                            ? null
-                                            : () async {
-                                                setState(() {
-                                                  _isSendingTelegram = true;
-                                                  _telegramErrorMessage = null;
-                                                });
-                                                final res = await widget.pos.sendTelegramShiftReport(shift);
-                                                if (mounted) {
-                                                  setState(() {
-                                                    _isSendingTelegram = false;
-                                                    if (res.success) {
-                                                      _telegramSentSuccess = true;
-                                                    } else {
-                                                      _telegramErrorMessage = res.message;
-                                                    }
-                                                  });
-                                                }
-                                              },
-                                        icon: const Icon(Icons.refresh_rounded, size: 14),
-                                        label: const Text('Coba Kirim Lagi (Retry)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                                      ),
-                                    ),
-                                  ] else
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 38,
-                                      child: ElevatedButton.icon(
-                                        onPressed: _isSendingTelegram
-                                            ? null
-                                            : () async {
-                                                setState(() {
-                                                  _isSendingTelegram = true;
-                                                  _telegramErrorMessage = null;
-                                                });
-                                                final res = await widget.pos.sendTelegramShiftReport(shift);
-                                                if (mounted) {
-                                                  setState(() {
-                                                    _isSendingTelegram = false;
-                                                    if (res.success) {
-                                                      _telegramSentSuccess = true;
-                                                    } else {
-                                                      _telegramErrorMessage = res.message;
-                                                    }
-                                                  });
-                                                }
-                                              },
-                                        icon: _isSendingTelegram
-                                            ? const SizedBox(
-                                                width: 14,
-                                                height: 14,
-                                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                              )
-                                            : const Icon(Icons.send_rounded, size: 14),
-                                        label: Text(
-                                          _isSendingTelegram ? 'Mengirim...' : 'Kirim Laporan ke Telegram',
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF0088CC), // Telegram brand accent
-                                          foregroundColor: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
                             ),
                             const SizedBox(height: 16),
                             // Primary actions after shift closed: responsive layout

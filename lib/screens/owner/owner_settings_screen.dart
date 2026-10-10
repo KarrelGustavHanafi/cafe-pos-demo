@@ -3,6 +3,7 @@ import '../../models/business_config.dart';
 import '../../models/order.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../services/telegram/telegram_bot_service.dart';
 
 class OwnerSettingsScreen extends StatefulWidget {
   final PosProvider pos;
@@ -83,7 +84,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
     _telegramChatIdController = TextEditingController(text: t.chatId);
     _telegramEndpointController = TextEditingController(text: t.endpoint);
     _telegramBotTokenController = TextEditingController(text: t.botToken ?? '');
-    _telegramIntegrationMode = t.integrationMode;
+    // Use safe mode: in public demo, Direct Bot API is replaced with Mock Simulation
+    _telegramIntegrationMode = t.getSafeMode(b.isPublicDemo);
 
     final q = b.qrisConfig;
     _isQrisEnabled = q.enabled;
@@ -169,7 +171,19 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
 
   Future<void> _testTelegramConnection() async {
     setState(() => _isTestingTelegram = true);
-    final res = await widget.pos.testTelegramConnection();
+    final tempConfig = TelegramConfig(
+      enabled: _isTelegramEnabled,
+      botUsername: _telegramBotUsernameController.text.trim(),
+      chatId: _telegramChatIdController.text.trim(),
+      endpoint: _telegramEndpointController.text.trim(),
+      integrationMode: _telegramIntegrationMode,
+      botToken: _telegramBotTokenController.text.trim().isEmpty ? null : _telegramBotTokenController.text.trim(),
+    );
+    final tempService = TelegramBotService(
+      config: tempConfig,
+      isPublicDemo: widget.pos.businessConfig.isPublicDemo,
+    );
+    final res = await tempService.testConnection();
     if (!mounted) return;
     setState(() => _isTestingTelegram = false);
 
@@ -182,11 +196,23 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
 
   Future<void> _sendTestTelegramMessage() async {
     setState(() => _isTestingTelegram = true);
+    final tempConfig = TelegramConfig(
+      enabled: _isTelegramEnabled,
+      botUsername: _telegramBotUsernameController.text.trim(),
+      chatId: _telegramChatIdController.text.trim(),
+      endpoint: _telegramEndpointController.text.trim(),
+      integrationMode: _telegramIntegrationMode,
+      botToken: _telegramBotTokenController.text.trim().isEmpty ? null : _telegramBotTokenController.text.trim(),
+    );
+    final tempService = TelegramBotService(
+      config: tempConfig,
+      isPublicDemo: widget.pos.businessConfig.isPublicDemo,
+    );
     final testMsg = '📢 TEST MESSAGE — ${_nameController.text}\n'
         'Halo! Ini adalah pesan uji coba dari CAFFE POS Web.\n'
         'Waktu: ${DateTime.now()}\n'
         'Status: Integrasi Berfungsi Normal.';
-    final res = await widget.pos.telegramService.sendMessage(testMsg);
+    final res = await tempService.sendMessage(testMsg);
     if (!mounted) return;
     setState(() => _isTestingTelegram = false);
 
@@ -194,6 +220,59 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
       title: 'Kirim Pesan Uji Coba Telegram',
       success: res.success,
       message: res.message,
+    );
+  }
+
+  Widget _buildTelegramStatusBadge() {
+    String text;
+    Color bg;
+    Color fg;
+    IconData icon;
+
+    if (!_isTelegramEnabled) {
+      text = 'DISCONNECTED';
+      bg = AppColors.dangerSoft;
+      fg = AppColors.danger;
+      icon = Icons.cancel_outlined;
+    } else if (_telegramIntegrationMode == TelegramIntegrationMode.mockSimulation) {
+      text = 'SIMULATION';
+      bg = const Color(0xFFF3E8FF);
+      fg = const Color(0xFF7E22CE);
+      icon = Icons.smart_toy_rounded;
+    } else {
+      final hasToken = _telegramIntegrationMode != TelegramIntegrationMode.directBotApi ||
+          _telegramBotTokenController.text.trim().isNotEmpty;
+      if (!hasToken || _telegramChatIdController.text.trim().isEmpty) {
+        text = 'DISCONNECTED';
+        bg = AppColors.dangerSoft;
+        fg = AppColors.danger;
+        icon = Icons.warning_amber_rounded;
+      } else {
+        text = 'CONNECTED';
+        bg = AppColors.successSoft;
+        fg = AppColors.success;
+        icon = Icons.check_circle_rounded;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: fg.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: fg),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: fg, letterSpacing: 0.5),
+          ),
+        ],
+      ),
     );
   }
 
@@ -294,11 +373,49 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildBusinessProfileTab(),
-          _buildIntegrationsTab(),
+          // Demo Mode Disclosure Banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.infoSoft,
+              border: Border(
+                bottom: BorderSide(color: AppColors.info.withValues(alpha: 0.3), width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: AppColors.info,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'DEMO ONLY · Data dapat tersimpan di browser. Jangan masukkan token rahasia atau kredensial produksi.',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.info,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildBusinessProfileTab(),
+                _buildIntegrationsTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -474,10 +591,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
               _buildSectionCard(
                 title: 'Integrasi Telegram',
                 icon: Icons.send_rounded,
-                trailing: Switch(
-                  value: _isTelegramEnabled,
-                  activeTrackColor: const Color(0xFF0088CC),
-                  onChanged: (v) => setState(() => _isTelegramEnabled = v),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTelegramStatusBadge(),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: _isTelegramEnabled,
+                      activeTrackColor: const Color(0xFF0088CC),
+                      onChanged: (v) => setState(() => _isTelegramEnabled = v),
+                    ),
+                  ],
                 ),
                 children: [
                   Container(
@@ -533,7 +657,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
                       labelText: 'Mode Integrasi Telegram',
                       prefixIcon: Icon(Icons.alt_route_rounded, size: 18),
                     ),
-                    items: TelegramIntegrationMode.values.map((mode) {
+                    items: TelegramIntegrationMode.values
+                        .where((mode) => !widget.pos.businessConfig.isPublicDemo || mode != TelegramIntegrationMode.directBotApi)
+                        .map((mode) {
                       return DropdownMenuItem(value: mode, child: Text(mode.label));
                     }).toList(),
                     onChanged: (v) {

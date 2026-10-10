@@ -7,6 +7,7 @@ import '../../widgets/demo_guide_widget.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/product_customization_dialog.dart';
 import '../../widgets/shadcn_components.dart';
+import '../../utils/shift_sale_guard.dart';
 
 class OrderScreen extends StatefulWidget {
   final PosProvider pos;
@@ -41,16 +42,25 @@ class _OrderScreenState extends State<OrderScreen> {
         context,
         product: product,
         onConfirm: (selectedModifiers, quantity, notes) {
-          widget.pos.addToCart(
-            product,
-            qty: quantity,
-            notes: notes,
-            modifiers: selectedModifiers,
-          );
+          try {
+            widget.pos.addToCart(
+              product,
+              qty: quantity,
+              notes: notes,
+              modifiers: selectedModifiers,
+            );
+          } on PosSaleBlockedException catch (e) {
+            _showBlockedMessage(e.message);
+          }
         },
       );
     } else {
-      widget.pos.addToCart(product);
+      try {
+        widget.pos.addToCart(product);
+      } on PosSaleBlockedException catch (e) {
+        _showBlockedMessage(e.message);
+        return;
+      }
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -61,6 +71,19 @@ class _OrderScreenState extends State<OrderScreen> {
         ),
       );
     }
+  }
+
+  /// Single place for blocked-shift feedback so the provider and the UI never
+  /// report the same failure twice.
+  void _showBlockedMessage(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.danger,
+      ),
+    );
   }
 
   @override
@@ -284,7 +307,12 @@ class _OrderScreenState extends State<OrderScreen> {
                 );
                 final preset = ShadcnButton(
                   onPressed: () {
-                    widget.pos.loadDemoQuickOrder();
+                    try {
+                      widget.pos.loadDemoQuickOrder();
+                    } on PosSaleBlockedException catch (e) {
+                      _showBlockedMessage(e.message);
+                      return;
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Menu Demo Dimuat: 2x Kopi Susu Aren + 1x French Fries'),

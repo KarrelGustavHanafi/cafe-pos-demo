@@ -132,7 +132,7 @@ class CartView extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'Pilih menu dari katalog untuk memulai pesanan pelanggan.',
+                            'Pilih menu dari katalog untuk memulai pesanan.',
                             textAlign: TextAlign.center,
                             style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                           ),

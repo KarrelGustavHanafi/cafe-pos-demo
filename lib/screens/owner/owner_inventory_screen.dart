@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/raw_material_form_dialog.dart';
 import '../../widgets/raw_material_stock_dialog.dart';
 import '../../widgets/recipe_editor_dialog.dart';
+import '../../widgets/shadcn_components.dart';
 import '../../widgets/stock_update_dialog.dart';
 
 class OwnerInventoryScreen extends StatefulWidget {
@@ -228,29 +229,42 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
           child: const Text('Inventaris'),
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: ElevatedButton.icon(
+          if (isMobile)
+            IconButton(
               onPressed: _isSendingTelegramAlert ? null : _sendTelegramStockAlert,
+              tooltip: _isSendingTelegramAlert ? 'Mengirim...' : 'Kirim Alert Stok ke Telegram',
               icon: _isSendingTelegramAlert
                   ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0088CC)),
                     )
-                  : const Icon(Icons.notifications_active_rounded, size: 14),
-              label: Text(
-                _isSendingTelegramAlert ? 'Mengirim...' : (isMobile ? 'Alert Stok' : 'Kirim Alert ke Telegram'),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0088CC),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                minimumSize: const Size(0, 36),
+                  : const Icon(Icons.notifications_active_rounded, color: Color(0xFF0088CC)),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: ElevatedButton.icon(
+                onPressed: _isSendingTelegramAlert ? null : _sendTelegramStockAlert,
+                icon: _isSendingTelegramAlert
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.notifications_active_rounded, size: 14),
+                label: Text(
+                  _isSendingTelegramAlert ? 'Mengirim...' : 'Kirim Alert ke Telegram',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0088CC),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size(0, 36),
+                ),
               ),
             ),
-          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(62),
@@ -515,8 +529,10 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
                 if (filteredProducts.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(32),
-                    child: Center(
-                      child: Text('Tidak ada menu yang sesuai dengan filter.', style: TextStyle(color: AppColors.textSecondary)),
+                    child: AppEmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'Tidak Ada Menu Ditemukan',
+                      description: 'Tidak ada produk menu yang sesuai dengan filter pencarian.',
                     ),
                   )
                 else
@@ -539,25 +555,16 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
   }
 
   Widget _buildProductRow(Product product) {
-    Color statusBg;
-    Color statusFg;
-    String statusText;
-
+    StockStatusLevel statusLevel;
     switch (product.stockStatus) {
       case StockStatus.outOfStock:
-        statusBg = AppColors.errorSoft;
-        statusFg = AppColors.error;
-        statusText = 'OUT OF STOCK';
+        statusLevel = StockStatusLevel.outOfStock;
         break;
       case StockStatus.lowStock:
-        statusBg = AppColors.warningSoft;
-        statusFg = AppColors.warning;
-        statusText = 'LOW STOCK';
+        statusLevel = StockStatusLevel.low;
         break;
       case StockStatus.inStock:
-        statusBg = AppColors.successSoft;
-        statusFg = AppColors.success;
-        statusText = 'IN STOCK';
+        statusLevel = StockStatusLevel.healthy;
         break;
     }
 
@@ -595,16 +602,21 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
               ),
             ),
             if (recipe != null && recipe.items.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '${recipe.items.length} bahan',
-                  style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+              const SizedBox(width: 4),
+              Flexible(
+                fit: FlexFit.loose,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${recipe.items.length} bahan',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+                  ),
                 ),
               ),
             ],
@@ -620,19 +632,9 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
       ],
     );
 
-    final statusBadge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: statusBg,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: statusFg.withValues(alpha: 0.3), width: 0.8),
-      ),
-      child: Text(
-        statusText,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusFg),
-      ),
+    final statusBadge = StockStatusBadge(
+      label: product.stockStatus.label,
+      level: statusLevel,
     );
 
     final stockCounter = Column(
@@ -948,8 +950,10 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
                 if (filteredMaterials.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(32),
-                    child: Center(
-                      child: Text('Tidak ada bahan baku yang cocok dengan filter.', style: TextStyle(color: AppColors.textSecondary)),
+                    child: AppEmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'Tidak Ada Bahan Baku',
+                      description: 'Tidak ada data bahan baku yang cocok dengan filter pencarian.',
                     ),
                   )
                 else
@@ -972,25 +976,16 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
   }
 
   Widget _buildRawMaterialRow(RawMaterial material) {
-    Color statusBg;
-    Color statusFg;
-    String statusText;
-
+    StockStatusLevel statusLevel;
     switch (material.status) {
       case StockStatus.outOfStock:
-        statusBg = AppColors.errorSoft;
-        statusFg = AppColors.error;
-        statusText = 'OUT OF STOCK';
+        statusLevel = StockStatusLevel.outOfStock;
         break;
       case StockStatus.lowStock:
-        statusBg = AppColors.warningSoft;
-        statusFg = AppColors.warning;
-        statusText = 'LOW STOCK';
+        statusLevel = StockStatusLevel.low;
         break;
       case StockStatus.inStock:
-        statusBg = AppColors.successSoft;
-        statusFg = AppColors.success;
-        statusText = 'IN STOCK';
+        statusLevel = StockStatusLevel.healthy;
         break;
     }
 
@@ -1044,19 +1039,9 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
       ],
     );
 
-    final statusBadge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: statusBg,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: statusFg.withValues(alpha: 0.3), width: 0.8),
-      ),
-      child: Text(
-        statusText,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusFg),
-      ),
+    final statusBadge = StockStatusBadge(
+      label: material.status.label,
+      level: statusLevel,
     );
 
     final stockCounter = Column(
@@ -1467,8 +1452,10 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
             child: filtered.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.all(32),
-                    child: Center(
-                      child: Text('Belum ada riwayat penyesuaian stok yang tercatat.', style: TextStyle(color: AppColors.textSecondary)),
+                    child: AppEmptyState(
+                      icon: Icons.history_rounded,
+                      title: 'Belum Ada Riwayat Stok',
+                      description: 'Belum ada log mutasi atau penyesuaian stok yang tercatat.',
                     ),
                   )
                 : ListView.separated(
@@ -1657,6 +1644,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
       ),
       child: Row(
         children: [

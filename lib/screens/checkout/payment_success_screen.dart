@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/business_config.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -6,7 +7,6 @@ class PaymentSuccessScreen extends StatelessWidget {
   final PosProvider pos;
   final VoidCallback onViewReceipt;
   final VoidCallback onNewOrder;
-  final VoidCallback? onGoToOwnerDashboard;
   final VoidCallback onGoToCashier;
 
   const PaymentSuccessScreen({
@@ -14,7 +14,6 @@ class PaymentSuccessScreen extends StatelessWidget {
     required this.pos,
     required this.onViewReceipt,
     required this.onNewOrder,
-    this.onGoToOwnerDashboard,
     required this.onGoToCashier,
   });
 
@@ -158,15 +157,67 @@ class PaymentSuccessScreen extends StatelessWidget {
 
                     const SizedBox(height: 22),
 
-                    // Primary Action: View Receipt
+                    // Primary Action: Print Receipt (Direct)
                     SizedBox(
                       width: double.infinity,
                       height: 44,
                       child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final order = pos.currentOrder ?? (pos.orders.isNotEmpty ? pos.orders.first : null);
+                          if (order != null) {
+                            if (pos.businessConfig.printerMode != PrinterModeType.browserPrint) {
+                              await pos.updateBusinessConfig(
+                                pos.businessConfig.copyWith(
+                                  printerMode: PrinterModeType.browserPrint,
+                                ),
+                              );
+                            }
+                            final result = await pos.printOrderReceipt(order);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      Icon(
+                                        result.success ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          result.message,
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  backgroundColor: result.success ? AppColors.primaryDark : AppColors.danger,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.print_rounded, size: 18),
+                        label: const Text(
+                          'Cetak Struk (Thermal)',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Secondary Action: View Receipt Details
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton.icon(
                         onPressed: onViewReceipt,
                         icon: const Icon(Icons.receipt_rounded, size: 18),
                         label: const Text(
-                          'Lihat Struk Pesanan (Receipt)',
+                          'Lihat Struk Pesanan',
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                         ),
                       ),
@@ -184,19 +235,6 @@ class PaymentSuccessScreen extends StatelessWidget {
                         label: const Text('Buat Pesanan Baru'),
                       ),
                     ),
-
-                    if (onGoToOwnerDashboard != null) ...[
-                      const SizedBox(height: 12),
-                      TextButton.icon(
-                        onPressed: onGoToOwnerDashboard,
-                        icon: const Icon(Icons.insights_rounded, size: 16),
-                        label: const Text('Buka Dashboard Owner'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary,
-                          minimumSize: const Size(0, 44),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

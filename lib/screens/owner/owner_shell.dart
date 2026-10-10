@@ -10,7 +10,6 @@ import 'owner_products_screen.dart';
 import 'owner_categories_screen.dart';
 import 'owner_inventory_screen.dart';
 import 'owner_tables_screen.dart';
-import 'owner_customers_screen.dart';
 import 'owner_reports_screen.dart';
 import 'owner_shifts_screen.dart';
 import 'owner_settings_screen.dart';
@@ -98,12 +97,10 @@ class _OwnerShellState extends State<OwnerShell> {
       case 7:
         return 'Manajemen Meja';
       case 8:
-        return 'Pelanggan';
-      case 9:
         return 'Laporan Bisnis';
-      case 10:
+      case 9:
         return 'Monitoring Shift';
-      case 11:
+      case 10:
         return 'Pengaturan Kafe';
       default:
         return 'Owner Portal';
@@ -115,9 +112,12 @@ class _OwnerShellState extends State<OwnerShell> {
 
     return Container(
       width: 240,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(right: BorderSide(color: AppColors.border, width: 1)),
+      decoration: BoxDecoration(
+        gradient: AppGradients.sidebarTint,
+        border: const Border(
+          right: BorderSide(color: AppColors.border, width: 1),
+        ),
+        boxShadow: AppShadows.sidebar,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -174,18 +174,33 @@ class _OwnerShellState extends State<OwnerShell> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.surfaceSubtle,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.borderLight),
+                border: Border.all(color: AppColors.border),
+                boxShadow: AppShadows.sm,
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: AppColors.primaryDark,
-                    child: Text(
-                      user?.displayName.substring(0, 1) ?? 'O',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.accentCaramel, AppColors.secondary],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        (user?.displayName ?? 'O').substring(0, 1).toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -197,11 +212,19 @@ class _OwnerShellState extends State<OwnerShell> {
                           user?.displayName ?? 'Pemilik',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                         const Text(
                           'Role: OWNER (Bisnis)',
-                          style: TextStyle(fontSize: 9.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -236,17 +259,16 @@ class _OwnerShellState extends State<OwnerShell> {
                 _buildSectionHeader('OPERASIONAL'),
                 _buildNavItem(2, Icons.receipt_long_rounded, 'Pesanan (Orders)', badge: '${widget.pos.todayTransactionsCount}'),
                 _buildNavItem(7, Icons.table_restaurant_rounded, 'Denah & Meja'),
-                _buildNavItem(10, Icons.lock_clock_rounded, 'Monitoring Shift'),
+                _buildNavItem(9, Icons.lock_clock_rounded, 'Monitoring Shift'),
 
                 const SizedBox(height: 6),
                 _buildSectionHeader('ANALISIS'),
                 _buildNavItem(3, Icons.bar_chart_rounded, 'Penjualan (Sales)'),
-                _buildNavItem(9, Icons.assessment_outlined, 'Laporan Bisnis'),
+                _buildNavItem(8, Icons.assessment_outlined, 'Laporan Bisnis'),
 
                 const SizedBox(height: 6),
-                _buildSectionHeader('LAINNYA'),
-                _buildNavItem(8, Icons.people_alt_outlined, 'Pelanggan'),
-                _buildNavItem(11, Icons.settings_outlined, 'Pengaturan Kafe'),
+                _buildSectionHeader('PENGATURAN'),
+                _buildNavItem(10, Icons.settings_outlined, 'Pengaturan Kafe'),
               ],
             ),
           ),
@@ -331,54 +353,74 @@ class _OwnerShellState extends State<OwnerShell> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: InkWell(
-        onTap: () => _navigateToTab(index),
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primarySoft : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? AppColors.primaryBorder : Colors.transparent,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
+        child: InkWell(
+          onTap: () => _navigateToTab(index),
+          borderRadius: BorderRadius.circular(10),
+          hoverColor: AppColors.primarySoft.withValues(alpha: 0.6),
+          child: AnimatedContainer(
+            duration: AppAnimations.fast,
+            curve: AppAnimations.defaultCurve,
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primarySoft : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isSelected ? AppColors.primaryBorder : Colors.transparent,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
+            ),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: AppAnimations.fast,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 17,
+                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
                   ),
                 ),
-              ),
-              if (badge != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: badgeColor ?? (isSelected ? AppColors.primary : AppColors.surfaceSubtle),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                const SizedBox(width: 10),
+                Expanded(
                   child: Text(
-                    badge,
+                    label,
                     style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                      color: isSelected || badgeColor != null ? Colors.white : AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
                     ),
                   ),
                 ),
-            ],
+                if (badge != null)
+                  AnimatedContainer(
+                    duration: AppAnimations.fast,
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: badgeColor ?? (isSelected ? AppColors.primary : AppColors.surfaceSubtle),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected || badgeColor != null
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -433,26 +475,57 @@ class _OwnerShellState extends State<OwnerShell> {
                   _buildSectionHeader('OPERASIONAL'),
                   _buildNavItem(2, Icons.receipt_long_rounded, 'Pesanan (Orders)'),
                   _buildNavItem(7, Icons.table_restaurant_rounded, 'Manajemen Meja'),
-                  _buildNavItem(10, Icons.lock_clock_rounded, 'Monitoring Shift'),
+                  _buildNavItem(9, Icons.lock_clock_rounded, 'Monitoring Shift'),
 
                   const SizedBox(height: 6),
                   _buildSectionHeader('ANALISIS'),
                   _buildNavItem(3, Icons.bar_chart_rounded, 'Penjualan (Sales)'),
-                  _buildNavItem(9, Icons.assessment_outlined, 'Laporan Bisnis'),
+                  _buildNavItem(8, Icons.assessment_outlined, 'Laporan Bisnis'),
 
                   const SizedBox(height: 6),
-                  _buildSectionHeader('LAINNYA'),
-                  _buildNavItem(8, Icons.people_alt_outlined, 'Pelanggan'),
-                  _buildNavItem(11, Icons.settings_outlined, 'Pengaturan Kafe'),
+                  _buildSectionHeader('PENGATURAN'),
+                  _buildNavItem(10, Icons.settings_outlined, 'Pengaturan Kafe'),
                 ],
               ),
             ),
-            Padding(
+            Container(
               padding: const EdgeInsets.all(12),
-              child: OutlinedButton.icon(
-                onPressed: widget.onLogout,
-                icon: const Icon(Icons.logout_rounded, size: 16),
-                label: const Text('Keluar Akun'),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+                        Navigator.of(context).pop();
+                      }
+                      widget.pos.switchUserRole(UserRole.cashier);
+                    },
+                    icon: const Icon(Icons.point_of_sale_rounded, size: 15, color: AppColors.primary),
+                    label: const Text(
+                      'Buka Kasir POS (Demo)',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      minimumSize: const Size(0, 44),
+                      side: const BorderSide(color: AppColors.primaryBorder),
+                      backgroundColor: AppColors.primarySoft,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: widget.onLogout,
+                    icon: const Icon(Icons.logout_rounded, size: 16),
+                    label: const Text('Keluar Akun Owner'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      minimumSize: const Size(0, 44),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -517,7 +590,7 @@ class _OwnerShellState extends State<OwnerShell> {
           onViewProducts: () => setState(() => _currentTab = 4),
           onViewOrders: () => setState(() => _currentTab = 2),
           onViewInventory: () => setState(() => _currentTab = 6),
-          onViewShifts: () => setState(() => _currentTab = 10),
+          onViewShifts: () => setState(() => _currentTab = 9),
           onViewTables: () => setState(() => _currentTab = 7),
         );
       case 1:
@@ -535,19 +608,17 @@ class _OwnerShellState extends State<OwnerShell> {
       case 7:
         content = OwnerTablesScreen(pos: widget.pos);
       case 8:
-        content = OwnerCustomersScreen(pos: widget.pos);
-      case 9:
         content = OwnerReportsScreen(pos: widget.pos);
-      case 10:
+      case 9:
         content = OwnerShiftsScreen(pos: widget.pos);
-      case 11:
+      case 10:
         content = OwnerSettingsScreen(pos: widget.pos);
       default:
         content = const SizedBox();
     }
 
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
+      duration: AppAnimations.normal,
       transitionBuilder: (child, animation) => FadeTransition(
         opacity: animation,
         child: child,

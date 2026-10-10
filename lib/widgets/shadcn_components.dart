@@ -950,3 +950,435 @@ class ShadcnDialog extends StatelessWidget {
     );
   }
 }
+
+/// Reusable Empty State — explains what the user can do next
+class AppEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? description;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const AppEmptyState({
+    super.key,
+    this.icon = Icons.inbox_outlined,
+    required this.title,
+    this.description,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSubtle,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.borderLight, width: 1.5),
+              ),
+              child: Icon(icon, color: AppColors.textMuted, size: 32),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: AppTypography.cardTitle,
+            ),
+            if (description != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Text(
+                  description!,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.supporting,
+                ),
+              ),
+            ],
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: AppSpacing.xl),
+              ShadcnButton(
+                onPressed: onAction,
+                icon: const Icon(Icons.add_rounded),
+                text: actionLabel,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Reusable Loading State
+class AppLoadingState extends StatelessWidget {
+  final String? message;
+
+  const AppLoadingState({super.key, this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.primary.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+            if (message != null) ...[
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                message!,
+                textAlign: TextAlign.center,
+                style: AppTypography.supporting,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Reusable Error State — explains what happened and what the user can do
+class AppErrorState extends StatelessWidget {
+  final String title;
+  final String? description;
+  final VoidCallback? onRetry;
+
+  const AppErrorState({
+    super.key,
+    this.title = 'Terjadi Kesalahan',
+    this.description,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.dangerSoft,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.danger.withValues(alpha: 0.2),
+                ),
+              ),
+              child: const Icon(
+                Icons.error_outline_rounded,
+                color: AppColors.danger,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: AppTypography.cardTitle,
+            ),
+            if (description != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Text(
+                  description!,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.supporting,
+                ),
+              ),
+            ],
+            if (onRetry != null) ...[
+              const SizedBox(height: AppSpacing.xl),
+              ShadcnButton(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                text: 'Coba Lagi',
+                variant: ShadButtonVariant.outline,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Upgraded KPI Card with trend indicator and optional icon accent
+class KpiCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String? subtitle;
+  final IconData icon;
+  final Color accentColor;
+  final String? trend; // e.g. "+12%" or "↑ 5"
+  final bool isTrendPositive;
+  final VoidCallback? onTap;
+
+  /// Minimum extent (height) for grid placement.
+  static const double minExtent = 148;
+
+  const KpiCard({
+    super.key,
+    required this.title,
+    required this.value,
+    this.subtitle,
+    required this.icon,
+    this.accentColor = AppColors.primary,
+    this.trend,
+    this.isTrendPositive = true,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppRadius.roundedCard,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.roundedCard,
+        hoverColor: accentColor.withValues(alpha: 0.04),
+        child: AnimatedContainer(
+          duration: AppAnimations.fast,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.roundedCard,
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.1),
+                      borderRadius: AppRadius.roundedSm,
+                    ),
+                    child: Icon(icon, color: accentColor, size: 18),
+                  ),
+                  const Spacer(),
+                  if (trend != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isTrendPositive
+                            ? AppColors.successSoft
+                            : AppColors.dangerSoft,
+                        borderRadius: AppRadius.roundedFull,
+                        border: Border.all(
+                          color: (isTrendPositive
+                                  ? AppColors.success
+                                  : AppColors.danger)
+                              .withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Text(
+                        trend!,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: isTrendPositive
+                              ? const Color(0xFF047857)
+                              : AppColors.danger,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: accentColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Reusable Brand Header widget — eliminates duplicate brand rows
+class BrandHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const BrandHeader({
+    super.key,
+    this.title = 'CAFFE',
+    required this.subtitle,
+    this.icon = Icons.coffee_rounded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.primarySoft,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.primaryBorder),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 20),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2.0,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Inventory Status Badge — visual state with icon + label (not color-only)
+class StockStatusBadge extends StatelessWidget {
+  final String label;
+  final StockStatusLevel level;
+
+  const StockStatusBadge({
+    super.key,
+    required this.label,
+    required this.level,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color bg, fg;
+    IconData icon;
+
+    switch (level) {
+      case StockStatusLevel.healthy:
+        bg = AppColors.successSoft;
+        fg = const Color(0xFF047857);
+        icon = Icons.check_circle_outlined;
+      case StockStatusLevel.low:
+        bg = AppColors.warningSoft;
+        fg = const Color(0xFFB45309);
+        icon = Icons.warning_amber_rounded;
+      case StockStatusLevel.critical:
+        bg = AppColors.dangerSoft;
+        fg = AppColors.danger;
+        icon = Icons.error_outline_rounded;
+      case StockStatusLevel.outOfStock:
+        bg = const Color(0xFFF1F5F9);
+        fg = AppColors.textMuted;
+        icon = Icons.block_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: AppRadius.roundedSm,
+        border: Border.all(color: fg.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum StockStatusLevel { healthy, low, critical, outOfStock }

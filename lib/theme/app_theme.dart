@@ -92,6 +92,116 @@ class AppRadius {
   static BorderRadius get roundedFull => BorderRadius.circular(full);
 }
 
+/// Centralized Elevation / Shadow Tokens
+class AppShadows {
+  /// Subtle card resting state
+  static const List<BoxShadow> sm = [
+    BoxShadow(
+      color: Color(0x08000000),
+      blurRadius: 4,
+      offset: Offset(0, 1),
+    ),
+  ];
+
+  /// Interactive card hover / focus
+  static const List<BoxShadow> md = [
+    BoxShadow(
+      color: Color(0x0F000000),
+      blurRadius: 8,
+      offset: Offset(0, 2),
+    ),
+  ];
+
+  /// Elevated panels, dialogs
+  static const List<BoxShadow> lg = [
+    BoxShadow(
+      color: Color(0x14000000),
+      blurRadius: 16,
+      offset: Offset(0, 4),
+    ),
+  ];
+
+  /// Floating elements (FABs, floating cart bar)
+  static const List<BoxShadow> xl = [
+    BoxShadow(
+      color: Color(0x1A000000),
+      blurRadius: 24,
+      offset: Offset(0, 8),
+    ),
+  ];
+
+  /// Sidebar subtle inner glow
+  static const List<BoxShadow> sidebar = [
+    BoxShadow(
+      color: Color(0x06000000),
+      blurRadius: 12,
+      offset: Offset(2, 0),
+    ),
+  ];
+}
+
+/// Centralized Animation Tokens
+class AppAnimations {
+  // Durations
+  static const Duration instant = Duration(milliseconds: 100);
+  static const Duration fast = Duration(milliseconds: 150);
+  static const Duration normal = Duration(milliseconds: 200);
+  static const Duration smooth = Duration(milliseconds: 300);
+  static const Duration slow = Duration(milliseconds: 400);
+  static const Duration entrance = Duration(milliseconds: 500);
+
+  // Curves
+  static const Curve defaultCurve = Curves.easeOutCubic;
+  static const Curve emphasis = Curves.easeOutBack;
+  static const Curve spring = Curves.elasticOut;
+  static const Curve decelerate = Curves.decelerate;
+}
+
+/// Centralized Gradient Presets
+class AppGradients {
+  /// Login / brand background — soft teal-to-cream
+  static const LinearGradient brandBackground = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFFF0FDFA), // Teal 50
+      Color(0xFFFAFAF7), // Warm white
+      Color(0xFFFEF3C7), // Amber 100 — warm cafe hint
+    ],
+    stops: [0.0, 0.5, 1.0],
+  );
+
+  /// Sidebar subtle tint
+  static const LinearGradient sidebarTint = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFFFCFDFC),
+      Color(0xFFF8FAF8),
+    ],
+  );
+
+  /// Primary button gradient for emphasis CTAs
+  static const LinearGradient primaryButton = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFF14B8A6), // Teal 500
+      Color(0xFF0D9488), // Teal 600
+    ],
+  );
+
+  /// Success confirmation gradient
+  static const LinearGradient success = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFFECFDF5),
+      Color(0xFFF0FDF9),
+    ],
+  );
+}
+
 /// Centralized Typography Hierarchy with Nunito Sans
 class AppTypography {
   static const String fontFamily = 'Nunito Sans';

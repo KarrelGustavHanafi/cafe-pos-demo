@@ -4,7 +4,6 @@ import '../models/table.dart';
 import '../models/cart_item.dart';
 import '../models/order.dart';
 import '../models/shift.dart';
-import '../models/customer.dart';
 import '../models/stock_adjustment.dart';
 import '../models/raw_material.dart';
 import '../models/recipe.dart';
@@ -593,6 +592,10 @@ class MockData {
       status: OrderStatus.paid,
       paidAmount: 35650,
       createdAt: now.subtract(const Duration(hours: 3, minutes: 15)),
+      taxRate: 0.10,
+      serviceChargeRate: 0.05,
+      isTaxEnabled: true,
+      isServiceEnabled: true,
     );
 
     // Sample previous order 2: Matcha Latte x2 + Chicken Katsu (Cash)
@@ -612,6 +615,10 @@ class MockData {
       paidAmount: 100000,
       changeAmount: 21800,
       createdAt: now.subtract(const Duration(hours: 1, minutes: 45)),
+      taxRate: 0.10,
+      serviceChargeRate: 0.05,
+      isTaxEnabled: true,
+      isServiceEnabled: true,
     );
 
     // Sample previous order 3: Kopi Susu x3 + French Fries (Debit Card)
@@ -631,61 +638,15 @@ class MockData {
       paidAmount: 81650,
       changeAmount: 0,
       createdAt: now.subtract(const Duration(minutes: 40)),
+      taxRate: 0.10,
+      serviceChargeRate: 0.05,
+      isTaxEnabled: true,
+      isServiceEnabled: true,
     );
 
     return [order3, order2, order1];
   }
 
-  static List<Customer> getInitialCustomers() {
-    final now = DateTime.now();
-    return [
-      Customer(
-        id: 'CUST-001',
-        name: 'Rian Pratama',
-        phone: '0812-8899-1122',
-        totalOrders: 14,
-        totalSpend: 485000,
-        lastTransaction: now.subtract(const Duration(hours: 2)),
-        notes: 'Pelanggan tetap meja A03. Suka Kopi Susu Aren less sugar.',
-      ),
-      Customer(
-        id: 'CUST-002',
-        name: 'Nadia Safira',
-        phone: '0813-9988-2233',
-        totalOrders: 9,
-        totalSpend: 312000,
-        lastTransaction: now.subtract(const Duration(hours: 4)),
-        notes: 'Sering pesan Matcha Latte & Croissant hangat.',
-      ),
-      Customer(
-        id: 'CUST-003',
-        name: 'Dimas Arya',
-        phone: '0856-7788-9900',
-        totalOrders: 6,
-        totalSpend: 198000,
-        lastTransaction: now.subtract(const Duration(days: 1)),
-        notes: 'Suka kerja WFC di outdoor table B02.',
-      ),
-      Customer(
-        id: 'CUST-004',
-        name: 'Jessica Tan',
-        phone: '0819-1122-3344',
-        totalOrders: 4,
-        totalSpend: 145000,
-        lastTransaction: now.subtract(const Duration(days: 2)),
-        notes: 'Pencinta Chocolate & French fries.',
-      ),
-      Customer(
-        id: 'CUST-005',
-        name: 'Bambang Wijaya',
-        phone: '0811-2233-4455',
-        totalOrders: 3,
-        totalSpend: 98000,
-        lastTransaction: now.subtract(const Duration(days: 3)),
-        notes: 'Pesan Americano panas tanpa gula.',
-      ),
-    ];
-  }
 
   static List<StockAdjustment> getInitialStockAdjustments() {
     final now = DateTime.now();

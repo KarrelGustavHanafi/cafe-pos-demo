@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/product.dart';
@@ -5,7 +6,6 @@ import '../models/table.dart';
 import '../models/cart_item.dart';
 import '../models/order.dart';
 import '../models/shift.dart';
-import '../models/customer.dart';
 import '../models/stock_adjustment.dart';
 import '../models/cafe_settings.dart';
 import '../models/raw_material.dart';
@@ -23,7 +23,11 @@ import '../services/payment/qris_payment_service.dart';
 import '../services/printer/printer_service.dart';
 import '../services/telegram/telegram_service.dart';
 import '../services/telegram/telegram_bot_service.dart';
+import '../services/telegram/telegram_notification_service.dart';
 import '../services/receipt/receipt_service.dart';
+import '../utils/cart_calculator.dart';
+import '../utils/recipe_calculator.dart';
+import '../utils/shift_sale_guard.dart';
 
 class PosProvider extends ChangeNotifier {
   User? _currentUser;
@@ -33,7 +37,6 @@ class PosProvider extends ChangeNotifier {
   late ShiftInfo _currentShift;
   late List<ShiftInfo> _pastShifts;
   late List<ProductCategory> _categories;
-  late List<Customer> _customers;
   late List<StockAdjustment> _stockAdjustments;
   late CafeSettings _settings;
   late BusinessConfig _businessConfig;
@@ -41,6 +44,7 @@ class PosProvider extends ChangeNotifier {
   late BusinessConfigService _configService;
   late ReceiptService _receiptService;
   late TelegramService _telegramService;
+  late TelegramNotificationService _telegramNotificationService;
   late List<RawMaterial> _rawMaterials;
   late Map<String, ProductRecipe> _recipes;
 
@@ -60,7 +64,11 @@ class PosProvider extends ChangeNotifier {
     _businessConfig = _configService.config;
     _receiptService = ReceiptService();
     _receiptService.updatePrinterMode(_businessConfig.printerMode);
-    _telegramService = TelegramBotService(config: _businessConfig.telegramConfig);
+    _telegramService = TelegramBotService(
+      config: _businessConfig.telegramConfig,
+      isPublicDemo: _businessConfig.isPublicDemo,
+    );
+    _telegramNotificationService = TelegramNotificationService(_telegramService);
 
     _products = MockData.getInitialProducts();
     _tables = MockData.getInitialTables();
@@ -75,11 +83,17 @@ class PosProvider extends ChangeNotifier {
       ProductCategory.dessert,
       ProductCategory.pastry,
     ];
-    _customers = MockData.getInitialCustomers();
     _stockAdjustments = MockData.getInitialStockAdjustments();
     _settings = const CafeSettings();
     _rawMaterials = MockData.getInitialRawMaterials();
     _recipes = MockData.getInitialRecipes();
+
+    // Seed existing low-stock items to prevent repeat alert spam on initial run
+    final initialLowStockIds = [
+      ..._products.where((p) => p.stock <= _businessConfig.defaultLowStockThreshold).map((p) => p.id),
+      ..._rawMaterials.where((m) => m.stock <= m.minimumStock).map((m) => m.id),
+    ];
+    _telegramNotificationService.seedAlreadyLowStockItems(initialLowStockIds);
   }
 
   // Getters
@@ -93,7 +107,6 @@ class PosProvider extends ChangeNotifier {
   List<ShiftInfo> get pastShifts => List.unmodifiable(_pastShifts);
   List<ShiftInfo> get allShifts => [_currentShift, ..._pastShifts];
   List<ProductCategory> get categories => List.unmodifiable(_categories);
-  List<Customer> get customers => List.unmodifiable(_customers);
   List<StockAdjustment> get stockAdjustments => List.unmodifiable(_stockAdjustments);
   CafeSettings get settings => _settings;
   BusinessConfig get businessConfig => _businessConfig;
@@ -101,9 +114,27 @@ class PosProvider extends ChangeNotifier {
   ReceiptService get receiptService => _receiptService;
   PrinterService get printerService => _receiptService.printerService;
   TelegramService get telegramService => _telegramService;
+  TelegramNotificationService get telegramNotificationService => _telegramNotificationService;
   CafeTable? get selectedTable => _selectedTable;
   List<CartItem> get cart => List.unmodifiable(_cart);
   Order? get currentOrder => _currentOrder;
+
+  // ==========================================
+  // SHIFT GATE (Closed-Shift Guard)
+  // ==========================================
+
+  /// True when a new sale may begin. The POS always keeps exactly one current
+  /// shift; a closed shift means no cashier is on duty, so no new sale,
+  /// checkout or payment may be started until [startNewShift] is called.
+  bool get hasActiveShift => !_currentShift.isClosed;
+
+  /// Single centralized validation used by every cashier-facing sale operation.
+  /// Throws [ShiftSaleBlockedException] so a blocked operation can never be
+  /// mistaken for a successful one (no silent success reporting).
+  void ensureShiftOpenForSale() {
+    if (hasActiveShift) return;
+    throw const ShiftSaleBlockedException(shiftClosedSaleMessage);
+  }
 
   // Raw Material & Recipe Getters
   List<RawMaterial> get rawMaterials => List.unmodifiable(_rawMaterials);
@@ -135,7 +166,6 @@ class PosProvider extends ChangeNotifier {
     _currentUser = null;
     clearCart();
     _selectedTable = null;
-    _currentOrder = null;
     notifyListeners();
   }
 
@@ -156,12 +186,18 @@ class PosProvider extends ChangeNotifier {
   }
 
   // Cart Management (Cashier)
+  /// Adds a product to the cart.
+  ///
+  /// Throws [ShiftSaleBlockedException] when no active shift exists so a new
+  /// sale can never start outside a shift.
   void addToCart(
     Product product, {
     int qty = 1,
     String notes = '',
     List<ModifierOption> modifiers = const [],
   }) {
+    ensureShiftOpenForSale();
+
     final newItem = CartItem(
       product: product,
       quantity: qty,
@@ -265,11 +301,17 @@ class PosProvider extends ChangeNotifier {
 
   void clearCart() {
     _cart.clear();
+    _currentOrder = null;
     notifyListeners();
   }
 
   /// Preset Demo Order: 2x Kopi Susu Gula Aren, 1x French Fries
+  ///
+  /// Builds a new cart, so it is guarded by the same shift check as
+  /// [addToCart] and throws [ShiftSaleBlockedException] when the shift is closed.
   void loadDemoQuickOrder() {
+    ensureShiftOpenForSale();
+
     _cart.clear();
     final kopiSusu = _products.firstWhere(
       (p) => p.name == 'Kopi Susu Gula Aren',
@@ -298,14 +340,18 @@ class PosProvider extends ChangeNotifier {
   }
 
   // Order Calculations
-  int get cartSubtotal => _cart.fold<int>(0, (sum, item) => sum + item.itemTotal);
-  int get cartServiceCharge => _businessConfig.isServiceEnabled
-      ? (cartSubtotal * _businessConfig.serviceChargeRate).round()
-      : 0;
-  int get cartTax => _businessConfig.isTaxEnabled
-      ? (cartSubtotal * _businessConfig.taxRate).round()
-      : 0;
-  int get cartGrandTotal => cartSubtotal + cartServiceCharge + cartTax;
+  CartTotals get _cartTotals => CartCalculator.calculate(
+        items: _cart,
+        taxRate: _businessConfig.taxRate,
+        serviceChargeRate: _businessConfig.serviceChargeRate,
+        isTaxEnabled: _businessConfig.isTaxEnabled,
+        isServiceEnabled: _businessConfig.isServiceEnabled,
+      );
+
+  int get cartSubtotal => _cartTotals.subtotal;
+  int get cartServiceCharge => _cartTotals.serviceCharge;
+  int get cartTax => _cartTotals.tax;
+  int get cartGrandTotal => _cartTotals.grandTotal;
   int get cartItemCount => _cart.fold<int>(0, (sum, item) => sum + item.quantity);
 
   // Generate Next Order Number: ORD-YYYYMMDD-NNNN
@@ -320,7 +366,12 @@ class PosProvider extends ChangeNotifier {
   }
 
   // Checkout flow: prepare order
+  ///
+  /// Throws [ShiftSaleBlockedException] when checkout is started without an
+  /// active shift. No order is created and [_currentOrder] stays untouched.
   Order prepareCheckoutOrder({PaymentMethod paymentMethod = PaymentMethod.cash}) {
+    ensureShiftOpenForSale();
+
     final tableNum = _selectedTable?.number ?? 'Takeaway';
     final cashier = _currentUser?.displayName ?? 'Siti Rahma (Kasir)';
     final order = Order.create(
@@ -330,6 +381,10 @@ class PosProvider extends ChangeNotifier {
       cashierName: cashier,
       paymentMethod: paymentMethod,
       status: OrderStatus.pending,
+      taxRate: _businessConfig.taxRate,
+      serviceChargeRate: _businessConfig.serviceChargeRate,
+      isTaxEnabled: _businessConfig.isTaxEnabled,
+      isServiceEnabled: _businessConfig.isServiceEnabled,
     );
     _currentOrder = order;
     notifyListeners();
@@ -337,72 +392,291 @@ class PosProvider extends ChangeNotifier {
   }
 
   // Payment Execution & Automatic Stock Depletion
+  ///
+  /// Rejects a new payment when no active shift exists by throwing
+  /// [ShiftSaleBlockedException] before any mutation happens, so stock, stock
+  /// adjustment history, table state and order status stay untouched.
+  ///
+  /// The duplicate-payment guard is evaluated first: an order that is already
+  /// paid is returned as-is (idempotent) even if the shift has since closed.
+  ///
+  /// The commit runs as plan-then-apply: every mutation is computed first
+  /// (including a stock sufficiency check), then applied inside a snapshot
+  /// guarded block. Any error during apply rolls the whole sale back, so a
+  /// failed checkout can never leave a paid order without its inventory.
   Order completePayment({
     required PaymentMethod method,
     required int paidAmount,
     required int changeAmount,
   }) {
+    // Guard: prevent duplicate payment for the same order
+    if (_currentOrder != null && _currentOrder!.status == OrderStatus.paid) {
+      return _currentOrder!; // Return the already-paid order without reprocessing
+    }
+
+    // Guard: no new payment may be processed outside an active shift.
+    ensureShiftOpenForSale();
+
     if (_currentOrder == null) {
       prepareCheckoutOrder(paymentMethod: method);
     }
 
-    final finishedOrder = _currentOrder!.copyWith(
+    final order = _currentOrder!;
+
+    // Guard: a payment cannot be settled for an order with no items.
+    if (order.items.isEmpty) {
+      throw const InvalidPaymentException(
+        'Pesanan kosong. Tidak ada item untuk dibayar.',
+      );
+    }
+
+    // Guard: cash must actually cover the total. Non-cash methods settle the
+    // exact grand total at the gateway, so they are not checked here.
+    if (method == PaymentMethod.cash && paidAmount < order.grandTotal) {
+      throw InvalidPaymentException(
+        'Uang diterima kurang dari total pembayaran (${order.grandTotal}).',
+      );
+    }
+
+    // Build the full mutation plan before touching any state. Throws
+    // InsufficientStockException when stock or ingredients are short.
+    final plan = _buildSalePlan(order);
+
+    final paymentTimestamp = DateTime.now();
+    final finishedOrder = order.copyWith(
       paymentMethod: method,
       status: OrderStatus.paid,
       paidAmount: paidAmount,
       changeAmount: changeAmount,
-      createdAt: DateTime.now(),
+      createdAt: paymentTimestamp,
     );
 
-    // 1. Add to completed orders
+    final snapshot = _captureSaleSnapshot(plan);
+    try {
+      _applySalePlan(plan, finishedOrder, paymentTimestamp);
+    } catch (_) {
+      _restoreSaleSnapshot(snapshot);
+      rethrow;
+    }
+
+    // Automatic Telegram Business Events Notification (non-blocking / fire-and-forget)
+    unawaited(_telegramNotificationService.onTransactionCompleted(
+      finishedOrder,
+      deductions: plan.deductionsList,
+      newlyLowStockItems: plan.newlyLowStock,
+    ));
+
+    return finishedOrder;
+  }
+
+  /// Computes every inventory/history mutation for [order] without applying it,
+  /// and verifies that finished-product stock and recipe ingredients suffice.
+  _SalePlan _buildSalePlan(Order order) {
+    // Aggregate ingredient demand per material across every cart line, so two
+    // lines sharing an ingredient are validated (and deducted) as one total.
+    final materialDemand = <String, ({String name, double amount, String unit})>{};
+    for (final item in order.items) {
+      for (final entry in getRequiredIngredientsForItem(item).entries) {
+        final matIndex = _rawMaterials.indexWhere((m) => m.id == entry.key);
+        if (matIndex < 0) continue;
+        final mat = _rawMaterials[matIndex];
+        final existing = materialDemand[mat.id];
+        materialDemand[mat.id] = (
+          name: mat.name,
+          amount: (existing?.amount ?? 0.0) + entry.value,
+          unit: mat.unit.label,
+        );
+      }
+    }
+
+    // Aggregate finished-product demand per product across every cart line.
+    final productDemand = <String, ({String name, int amount})>{};
+    for (final item in order.items) {
+      final existing = productDemand[item.product.id];
+      productDemand[item.product.id] = (
+        name: item.product.name,
+        amount: (existing?.amount ?? 0) + item.quantity,
+      );
+    }
+
+    // Validate BEFORE planning any mutation.
+    final shortages = <String>[];
+    for (final demand in productDemand.entries) {
+      final productIndex = _products.indexWhere((p) => p.id == demand.key);
+      if (productIndex < 0) continue;
+      final available = _products[productIndex].stock;
+      if (demand.value.amount > available) {
+        shortages.add(
+          '${demand.value.name}: stok tersedia $available, dibutuhkan ${demand.value.amount}',
+        );
+      }
+    }
+    for (final entry in materialDemand.entries) {
+      final matIndex = _rawMaterials.indexWhere((m) => m.id == entry.key);
+      if (matIndex < 0) continue;
+      final mat = _rawMaterials[matIndex];
+      if (entry.value.amount > mat.stock) {
+        shortages.add(
+          '${entry.value.name}: stok tersedia ${_formatQty(mat.stock)} ${mat.unit.label}, '
+          'dibutuhkan ${_formatQty(entry.value.amount)} ${mat.unit.label}',
+        );
+      }
+    }
+    if (shortages.isNotEmpty) {
+      throw InsufficientStockException(shortages);
+    }
+
+    // Finished-product deductions: one entry per cart line so that repeated
+    // lines of the same product (different modifiers) each get their own
+    // history row. Deducting per line keeps history in step with the deduction.
+    //
+    // The running balance matters: when one order carries several lines of the
+    // same product, each line must deduct from the result of the previous line.
+    // Reading the live stock for every line would make all lines share one
+    // `previousStock` and one `newStock`, so the last line would overwrite the
+    // earlier deductions and the ledger would claim more than was deducted.
+    final productDeductions = <_StockDeduction>[];
+    final runningProductStock = <int, int>{};
+    for (final item in order.items) {
+      final productIndex = _products.indexWhere((p) => p.id == item.product.id);
+      if (productIndex < 0) continue;
+      final previousStock = runningProductStock.putIfAbsent(
+        productIndex,
+        () => _products[productIndex].stock,
+      );
+      final newStock = (previousStock - item.quantity).clamp(0, 9999);
+      runningProductStock[productIndex] = newStock;
+      productDeductions.add(
+        _StockDeduction(
+          adjustmentId: 'ADJ-SALE-${order.orderNumber}-${item.product.id}-${_lineSuffix(item, order)}',
+          collectionIndex: productIndex,
+          quantity: item.quantity.toDouble(),
+          previousStock: previousStock.toDouble(),
+          newStock: newStock.toDouble(),
+          name: item.product.name,
+          unit: 'pcs',
+          isRawMaterial: false,
+          minimumStock: _businessConfig.defaultLowStockThreshold.toDouble(),
+          reason: 'Penjualan #${order.orderNumber} (${item.quantity}x ${item.product.name}'
+              '${item.hasModifiers ? ' [${item.modifierSummary}]' : ''})',
+        ),
+      );
+    }
+
+    // Raw-material deductions: one aggregated entry per material per order.
+    final materialDeductions = <_StockDeduction>[];
+    for (final entry in materialDemand.entries) {
+      final matIndex = _rawMaterials.indexWhere((m) => m.id == entry.key);
+      if (matIndex < 0) continue;
+      final mat = _rawMaterials[matIndex];
+      materialDeductions.add(
+        _StockDeduction(
+          adjustmentId: 'ADJ-MAT-${order.orderNumber}-${mat.id}',
+          collectionIndex: matIndex,
+          quantity: entry.value.amount,
+          previousStock: mat.stock,
+          newStock: (mat.stock - entry.value.amount).clamp(0.0, 999999.0),
+          name: entry.value.name,
+          unit: entry.value.unit,
+          isRawMaterial: true,
+          minimumStock: mat.minimumStock,
+          reason: 'Penjualan #${order.orderNumber} (${_formatQty(entry.value.amount)} ${entry.value.unit} ${entry.value.name})',
+        ),
+      );
+    }
+
+    final deductionsList = <({String name, double amount, String unit})>[
+      for (final d in materialDeductions)
+        (name: d.name, amount: d.quantity, unit: d.unit),
+    ];
+    // If no raw materials were deducted, record finished product deductions
+    if (deductionsList.isEmpty) {
+      for (final d in productDeductions) {
+        deductionsList.add((name: d.name, amount: d.quantity, unit: 'pcs'));
+      }
+    }
+
+    return _SalePlan(
+      orderNumber: order.orderNumber,
+      productDeductions: productDeductions,
+      materialDeductions: materialDeductions,
+      deductionsList: deductionsList,
+    );
+  }
+
+  /// Stable per-line discriminator for finished-product adjustment IDs.
+  ///
+  /// Uses the 1-based line position within the immutable order, so two cart
+  /// lines of the same product (different modifiers) always differ, and the
+  /// same line always maps to the same ID across payment retries.
+  String _lineSuffix(CartItem item, Order order) {
+    final index = order.items.indexOf(item);
+    return 'L${index + 1}';
+  }
+
+  /// Applies a previously validated plan. Every step here is assumed to be
+  /// non-throwing except for the test seam; the caller rolls back on error.
+  void _applySalePlan(
+    _SalePlan plan,
+    Order finishedOrder,
+    DateTime paymentTimestamp,
+  ) {
+    final newlyLowStock = <LowStockItemData>[];
+
+    // 1. Finished-product stock deduction.
+    // Each planned line carries a chained balance, so the last planned value
+    // for a product is its final stock. Collecting it first means the commit
+    // can never apply a stale intermediate value on top of a correct one.
+    for (final d in plan.productDeductions) {
+      _maybeTrackLowStock(
+        d,
+        newlyLowStock,
+        unit: 'porsi',
+      );
+    }
+    final finalProductStock = <int, int>{};
+    for (final d in plan.productDeductions) {
+      finalProductStock[d.collectionIndex] = d.newStock.round();
+    }
+    finalProductStock.forEach((index, stock) {
+      _products[index].stock = stock;
+    });
+
+    // 2. Raw-material stock deduction
+    for (final d in plan.materialDeductions) {
+      _rawMaterials[d.collectionIndex].stock = d.newStock;
+      _maybeTrackLowStock(d, newlyLowStock, unit: d.unit);
+    }
+
+    // 3. Commit the sale: order record, history, table and cart cleanup.
+    // Reaching this point means every inventory mutation above succeeded.
+    debugThrowAfterInventoryApply?.call();
+
+    for (final d in [...plan.productDeductions, ...plan.materialDeductions]) {
+      _stockAdjustments.insert(
+        0,
+        StockAdjustment(
+          id: d.adjustmentId,
+          productId: d.isRawMaterial
+              ? _rawMaterials[d.collectionIndex].id
+              : _products[d.collectionIndex].id,
+          productName: d.name,
+          type: AdjustmentType.sale,
+          quantity: d.quantity,
+          previousStock: d.previousStock,
+          newStock: d.newStock,
+          reason: d.reason,
+          timestamp: paymentTimestamp,
+          unit: d.unit,
+          isRawMaterial: d.isRawMaterial,
+          adjustedBy: 'Sistem POS (Kasir)',
+        ),
+      );
+    }
+
     _orders.insert(0, finishedOrder);
     _currentOrder = finishedOrder;
 
-    // 2. Finished-Product Stock Deduction
-    for (final item in finishedOrder.items) {
-      final productIndex = _products.indexWhere((p) => p.id == item.product.id);
-      if (productIndex >= 0) {
-        final currentStock = _products[productIndex].stock;
-        final newStock = (currentStock - item.quantity).clamp(0, 9999);
-        _products[productIndex].stock = newStock;
-      }
-    }
-
-    // 2b. Raw Material Auto-Deduction based on Recipes and Modifiers
-    for (final item in finishedOrder.items) {
-      final ingredientsNeeded = getRequiredIngredientsForItem(item);
-      for (final entry in ingredientsNeeded.entries) {
-        final matIndex = _rawMaterials.indexWhere((m) => m.id == entry.key);
-        if (matIndex >= 0) {
-          final mat = _rawMaterials[matIndex];
-          final prevStock = mat.stock;
-          final deductAmount = entry.value;
-          final newStock = (prevStock - deductAmount).clamp(0.0, 999999.0);
-          _rawMaterials[matIndex].stock = newStock;
-
-          final modInfo = item.hasModifiers ? ' [${item.modifierSummary}]' : '';
-          _stockAdjustments.insert(
-            0,
-            StockAdjustment(
-              id: 'ADJ-SALE-${DateTime.now().millisecondsSinceEpoch}-${mat.id}',
-              productId: mat.id,
-              productName: mat.name,
-              type: AdjustmentType.sale,
-              quantity: deductAmount,
-              previousStock: prevStock,
-              newStock: newStock,
-              reason: 'Penjualan #${finishedOrder.orderNumber} (${item.quantity}x ${item.product.name}$modInfo)',
-              timestamp: DateTime.now(),
-              unit: mat.unit.label,
-              isRawMaterial: true,
-              adjustedBy: 'Sistem POS (Kasir)',
-            ),
-          );
-        }
-      }
-    }
-
-    // 3. Update Table Status if dine-in
     if (_selectedTable != null) {
       final tableIndex = _tables.indexWhere((t) => t.id == _selectedTable!.id);
       if (tableIndex >= 0) {
@@ -411,12 +685,101 @@ class PosProvider extends ChangeNotifier {
       }
     }
 
-    // 4. Clear active cart
     _cart.clear();
 
+    plan.newlyLowStock.addAll(newlyLowStock);
+
     notifyListeners();
-    return finishedOrder;
   }
+
+  void _maybeTrackLowStock(
+    _StockDeduction d,
+    List<LowStockItemData> into, {
+    required String unit,
+  }) {
+    if (d.previousStock > d.minimumStock && d.newStock <= d.minimumStock) {
+      into.add(LowStockItemData(
+        id: d.isRawMaterial
+            ? _rawMaterials[d.collectionIndex].id
+            : _products[d.collectionIndex].id,
+        name: d.name,
+        currentStock: d.newStock,
+        minimumStock: d.minimumStock,
+        unit: unit,
+      ));
+    }
+  }
+
+  /// Test-only hook invoked once the sale plan has been applied but before the
+  /// order is committed. Throwing from it exercises the rollback path.
+  ///
+  /// Never set in production; there is no real API or I/O failure modelled
+  /// inside `completePayment`, so this seam is the only way to drive the
+  /// partial-commit scenario deterministically.
+  @visibleForTesting
+  void Function()? debugThrowAfterInventoryApply;
+
+  /// Captures the minimal state a sale can mutate, so a failed apply can be
+  /// undone completely.
+  _SaleSnapshot _captureSaleSnapshot(_SalePlan plan) {
+    return _SaleSnapshot(
+      productStocks: {
+        for (final d in plan.productDeductions)
+          d.collectionIndex: _products[d.collectionIndex].stock,
+      },
+      materialStocks: {
+        for (final d in plan.materialDeductions)
+          d.collectionIndex: _rawMaterials[d.collectionIndex].stock,
+      },
+      ordersLength: _orders.length,
+      adjustmentsLength: _stockAdjustments.length,
+      currentOrder: _currentOrder,
+      cart: List<CartItem>.from(_cart),
+      tableId: _selectedTable?.id,
+      tableStatus: _selectedTable == null
+          ? null
+          : _tables.indexWhere((t) => t.id == _selectedTable!.id) >= 0
+              ? _tables[_tables.indexWhere((t) => t.id == _selectedTable!.id)].status
+              : null,
+      tableOrderId: _selectedTable == null
+          ? null
+          : _tables.indexWhere((t) => t.id == _selectedTable!.id) >= 0
+              ? _tables[_tables.indexWhere((t) => t.id == _selectedTable!.id)].currentOrderId
+              : null,
+    );
+  }
+
+  void _restoreSaleSnapshot(_SaleSnapshot snapshot) {
+    snapshot.productStocks.forEach((index, stock) {
+      _products[index].stock = stock;
+    });
+    snapshot.materialStocks.forEach((index, stock) {
+      _rawMaterials[index].stock = stock;
+    });
+    if (_orders.length > snapshot.ordersLength) {
+      _orders.removeRange(snapshot.ordersLength, _orders.length);
+    }
+    if (_stockAdjustments.length > snapshot.adjustmentsLength) {
+      _stockAdjustments.removeRange(
+          snapshot.adjustmentsLength, _stockAdjustments.length);
+    }
+    _currentOrder = snapshot.currentOrder;
+    _cart
+      ..clear()
+      ..addAll(snapshot.cart);
+    final tableId = snapshot.tableId;
+    if (tableId != null && snapshot.tableStatus != null) {
+      final tableIndex = _tables.indexWhere((t) => t.id == tableId);
+      if (tableIndex >= 0) {
+        _tables[tableIndex].status = snapshot.tableStatus!;
+        _tables[tableIndex].currentOrderId = snapshot.tableOrderId;
+      }
+    }
+  }
+
+  String _formatQty(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(1);
 
   void freeTable(String tableNumber) {
     final index = _tables.indexWhere((t) => t.number == tableNumber);
@@ -439,6 +802,9 @@ class PosProvider extends ChangeNotifier {
     final index = _products.indexWhere((p) => p.id == updatedProduct.id);
     if (index >= 0) {
       _products[index] = updatedProduct;
+      if (updatedProduct.stock > _businessConfig.defaultLowStockThreshold) {
+        _telegramNotificationService.resetLowStockAlert(updatedProduct.id);
+      }
       notifyListeners();
     }
   }
@@ -511,6 +877,9 @@ class PosProvider extends ChangeNotifier {
     }
 
     _products[index].stock = newStock;
+    if (newStock > _businessConfig.defaultLowStockThreshold) {
+      _telegramNotificationService.resetLowStockAlert(product.id);
+    }
 
     // Log adjustment in audit history
     final record = StockAdjustment(
@@ -548,6 +917,9 @@ class PosProvider extends ChangeNotifier {
     final index = _rawMaterials.indexWhere((m) => m.id == updated.id);
     if (index >= 0) {
       _rawMaterials[index] = updated;
+      if (updated.stock > updated.minimumStock) {
+        _telegramNotificationService.resetLowStockAlert(updated.id);
+      }
       notifyListeners();
     }
   }
@@ -590,6 +962,9 @@ class PosProvider extends ChangeNotifier {
     }
 
     _rawMaterials[index].stock = newStock.toDouble();
+    if (newStock > mat.minimumStock) {
+      _telegramNotificationService.resetLowStockAlert(mat.id);
+    }
 
     _stockAdjustments.insert(
       0,
@@ -676,58 +1051,32 @@ class PosProvider extends ChangeNotifier {
   /// taking into account base recipe, size/temperature/sugar overrides, and add-on additions.
   Map<String, double> getRequiredIngredientsForItem(CartItem item) {
     final recipe = _recipes[item.product.id];
-    if (recipe == null) return {};
-
-    final Map<String, double> requiredPerUnit = {};
-
-    // 1. Base recipe items
-    for (final ing in recipe.items) {
-      requiredPerUnit[ing.materialId] = ing.quantity;
-    }
-
-    // 2. Modifier overrides (e.g. Large size, Hot 0g ice, Less sugar, No sugar)
-    for (final mod in item.selectedModifiers) {
-      if (mod.rawMaterialOverrides != null) {
-        for (final entry in mod.rawMaterialOverrides!.entries) {
-          requiredPerUnit[entry.key] = entry.value;
-        }
-      }
-    }
-
-    // 3. Modifier additions (e.g. Extra Shot +9g beans, Extra Milk +50ml milk, Extra Matcha +5g matcha)
-    for (final mod in item.selectedModifiers) {
-      for (final entry in mod.rawMaterialAdditions.entries) {
-        requiredPerUnit[entry.key] = (requiredPerUnit[entry.key] ?? 0.0) + entry.value;
-      }
-    }
-
-    // Multiply by item quantity
-    return requiredPerUnit.map((matId, qty) => MapEntry(matId, qty * item.quantity));
+    return RecipeCalculator.getRequiredIngredientsForItem(item: item, recipe: recipe);
   }
 
   /// Check all items in cart for raw material shortages taking modifiers into account
   List<String> getCartInsufficientIngredients() {
-    final Map<String, double> requiredTotals = {};
+    final requiredTotals = RecipeCalculator.aggregateRequiredIngredients(
+      items: _cart,
+      recipes: _recipes,
+    );
+
     final Map<String, RawMaterial> materialMap = {};
 
-    for (final item in _cart) {
-      final itemIngredients = getRequiredIngredientsForItem(item);
-      for (final entry in itemIngredients.entries) {
-        requiredTotals[entry.key] = (requiredTotals[entry.key] ?? 0.0) + entry.value;
-        if (!materialMap.containsKey(entry.key)) {
-          final mat = _rawMaterials.firstWhere(
-            (m) => m.id == entry.key,
-            orElse: () => RawMaterial(
-              id: entry.key,
-              name: 'Bahan ${entry.key}',
-              category: RawMaterialCategory.packaging,
-              unit: RawMaterialUnit.gram,
-              stock: 0,
-              minimumStock: 0,
-            ),
-          );
-          materialMap[entry.key] = mat;
-        }
+    for (final entry in requiredTotals.entries) {
+      if (!materialMap.containsKey(entry.key)) {
+        final mat = _rawMaterials.firstWhere(
+          (m) => m.id == entry.key,
+          orElse: () => RawMaterial(
+            id: entry.key,
+            name: 'Bahan ${entry.key}',
+            category: RawMaterialCategory.packaging,
+            unit: RawMaterialUnit.gram,
+            stock: 0,
+            minimumStock: 0,
+          ),
+        );
+        materialMap[entry.key] = mat;
       }
     }
 
@@ -812,13 +1161,6 @@ class PosProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ==========================================
-  // OWNER: CUSTOMER MANAGEMENT
-  // ==========================================
-  void addCustomer(Customer customer) {
-    _customers.add(customer);
-    notifyListeners();
-  }
 
   // ==========================================
   // OWNER: SETTINGS & BUSINESS CONFIG MANAGEMENT
@@ -871,7 +1213,11 @@ class PosProvider extends ChangeNotifier {
         defaultLowStockThreshold: loaded.defaultLowStockThreshold,
       );
       _receiptService.updatePrinterMode(loaded.printerMode);
-      _telegramService = TelegramBotService(config: loaded.telegramConfig);
+      _telegramService = TelegramBotService(
+        config: loaded.telegramConfig,
+        isPublicDemo: loaded.isPublicDemo,
+      );
+      _telegramNotificationService.telegramService = _telegramService;
       notifyListeners();
     } catch (_) {
       // Graceful fallback: maintain defaults without crash
@@ -899,7 +1245,17 @@ class PosProvider extends ChangeNotifier {
     );
     await _configService.saveConfig(newConfig);
     _receiptService.updatePrinterMode(newConfig.printerMode);
-    _telegramService = TelegramBotService(config: newConfig.telegramConfig);
+    _telegramService = TelegramBotService(
+      config: newConfig.telegramConfig,
+      isPublicDemo: newConfig.isPublicDemo,
+    );
+    _telegramNotificationService.telegramService = _telegramService;
+    notifyListeners();
+  }
+
+  void setTelegramService(TelegramService service) {
+    _telegramService = service;
+    _telegramNotificationService.telegramService = service;
     notifyListeners();
   }
 
@@ -951,6 +1307,8 @@ class PosProvider extends ChangeNotifier {
       cashSales: todayCashSales,
       qrisSales: todayQrisSales,
       debitSales: todayDebitSales,
+      totalItemsSold: todayTotalItemsSold,
+      averageOrderValue: todayAverageTransactionValue,
       topProducts: top,
       lowStockItems: lowStockNames,
       shiftReport: ShiftReportData(
@@ -964,41 +1322,21 @@ class PosProvider extends ChangeNotifier {
         variance: (_currentShift.actualEndingCash ?? (_currentShift.startingCash + todayCashSales)) -
             (_currentShift.startingCash + todayCashSales),
         cashSales: todayCashSales,
+        qrisSales: todayQrisSales,
+        totalSales: todaySalesTotal,
         totalTransactions: todayTransactionsCount,
         notes: _currentShift.closingNotes,
       ),
     );
 
-    return _telegramService.sendDailyReport(reportData);
-  }
-
-  Future<TelegramSendResult> sendTelegramShiftReport(ShiftInfo shift) async {
-    final cashSales = todayCashSales;
-    final expectedCash = shift.startingCash + cashSales;
-    final actualCash = shift.actualEndingCash ?? expectedCash;
-    final variance = actualCash - expectedCash;
-
-    final shiftData = ShiftReportData(
-      shiftName: shift.shiftName,
-      cashierName: shift.cashierName,
-      startTime: shift.startTime,
-      endTime: shift.closedAt,
-      startingCash: shift.startingCash,
-      expectedEndingCash: expectedCash,
-      actualEndingCash: actualCash,
-      variance: variance,
-      cashSales: cashSales,
-      totalTransactions: todayTransactionsCount,
-      notes: shift.closingNotes,
-    );
-
-    return _telegramService.sendShiftReport(shiftData);
+    return _telegramNotificationService.sendDailyReport(reportData);
   }
 
   Future<TelegramSendResult> sendTelegramLowStockAlert() async {
     final items = <LowStockItemData>[];
     for (final p in lowStockProducts) {
       items.add(LowStockItemData(
+        id: p.id,
         name: p.name,
         currentStock: p.stock,
         minimumStock: _businessConfig.defaultLowStockThreshold,
@@ -1007,6 +1345,7 @@ class PosProvider extends ChangeNotifier {
     }
     for (final m in alertRawMaterials) {
       items.add(LowStockItemData(
+        id: m.id,
         name: m.name,
         currentStock: m.stock,
         minimumStock: m.minimumStock,
@@ -1023,7 +1362,15 @@ class PosProvider extends ChangeNotifier {
   // ==========================================
   // SHIFT MANAGEMENT
   // ==========================================
-  void closeShift({required int actualEndingCash, String? notes}) {
+  /// Closes the current shift and archives it.
+  ///
+  /// Returns null without mutating anything when the shift is already closed,
+  /// which prevents accidental duplicate closure of an archived shift.
+  Future<TelegramSendResult?> closeShift({required int actualEndingCash, String? notes}) async {
+    if (!hasActiveShift) {
+      return null;
+    }
+
     _currentShift = _currentShift.copyWith(
       isClosed: true,
       closedAt: DateTime.now(),
@@ -1032,9 +1379,26 @@ class PosProvider extends ChangeNotifier {
     );
     _pastShifts.insert(0, _currentShift);
     notifyListeners();
+
+    // Automatic Telegram Shift Closed notification
+    return await _telegramNotificationService.onShiftClosed(
+      _currentShift,
+      totalSales: todaySalesTotal,
+      cashSales: todayCashSales,
+      qrisSales: todayQrisSales,
+      totalTransactions: todayTransactionsCount,
+    );
   }
 
-  void startNewShift({required int startingCash}) {
+  /// Opens a fresh shift, replacing the previously closed one.
+  ///
+  /// Returns false without mutating anything when a shift is already active, so
+  /// an open shift cannot be silently discarded.
+  bool startNewShift({required int startingCash}) {
+    if (hasActiveShift) {
+      return false;
+    }
+
     final now = DateTime.now();
     _currentShift = ShiftInfo(
       shiftId: 'SHIFT-${now.millisecondsSinceEpoch.toString().substring(7)}',
@@ -1044,6 +1408,10 @@ class PosProvider extends ChangeNotifier {
       startingCash: startingCash,
     );
     notifyListeners();
+
+    // Automatic Telegram Shift Opened notification (fire-and-forget)
+    unawaited(_telegramNotificationService.onShiftOpened(_currentShift));
+    return true;
   }
 
   // ==========================================
@@ -1232,3 +1600,78 @@ class PosProvider extends ChangeNotifier {
 }
 
 enum ReportPeriod { today, last7Days, last30Days }
+
+/// One planned stock deduction + matching audit-history row.
+///
+/// A deduction is fully described before anything is applied, so the applied
+/// mutation and the recorded history row can never disagree.
+class _StockDeduction {
+  /// Globally unique, stable across retries.
+  final String adjustmentId;
+
+  /// Index into `_products` or `_rawMaterials`, depending on [isRawMaterial].
+  final int collectionIndex;
+
+  final double quantity;
+  final double previousStock;
+  final double newStock;
+  final String name;
+  final String unit;
+  final bool isRawMaterial;
+  final double minimumStock;
+  final String reason;
+
+  const _StockDeduction({
+    required this.adjustmentId,
+    required this.collectionIndex,
+    required this.quantity,
+    required this.previousStock,
+    required this.newStock,
+    required this.name,
+    required this.unit,
+    required this.isRawMaterial,
+    required this.minimumStock,
+    required this.reason,
+  });
+}
+
+/// The complete, validated set of mutations for one sale.
+class _SalePlan {
+  final String orderNumber;
+  final List<_StockDeduction> productDeductions;
+  final List<_StockDeduction> materialDeductions;
+  final List<({String name, double amount, String unit})> deductionsList;
+  final List<LowStockItemData> newlyLowStock = [];
+
+  _SalePlan({
+    required this.orderNumber,
+    required this.productDeductions,
+    required this.materialDeductions,
+    required this.deductionsList,
+  });
+}
+
+/// Minimal undo record for a sale commit.
+class _SaleSnapshot {
+  final Map<int, int> productStocks;
+  final Map<int, double> materialStocks;
+  final int ordersLength;
+  final int adjustmentsLength;
+  final Order? currentOrder;
+  final List<CartItem> cart;
+  final String? tableId;
+  final TableStatus? tableStatus;
+  final String? tableOrderId;
+
+  const _SaleSnapshot({
+    required this.productStocks,
+    required this.materialStocks,
+    required this.ordersLength,
+    required this.adjustmentsLength,
+    required this.currentOrder,
+    required this.cart,
+    required this.tableId,
+    required this.tableStatus,
+    required this.tableOrderId,
+  });
+}

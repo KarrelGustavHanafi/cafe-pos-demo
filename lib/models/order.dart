@@ -59,10 +59,18 @@ class Order {
     int paidAmount = 0,
     int changeAmount = 0,
     DateTime? createdAt,
+    double taxRate = 0.10,
+    double serviceChargeRate = 0.05,
+    bool isTaxEnabled = true,
+    bool isServiceEnabled = true,
   }) {
     final subtotal = items.fold<int>(0, (sum, item) => sum + item.itemTotal);
-    final serviceCharge = (subtotal * 0.05).round();
-    final tax = (subtotal * 0.10).round();
+    final serviceCharge = isServiceEnabled
+        ? (subtotal * serviceChargeRate).round()
+        : 0;
+    final tax = isTaxEnabled
+        ? (subtotal * taxRate).round()
+        : 0;
     final grandTotal = subtotal + serviceCharge + tax;
 
     return Order(

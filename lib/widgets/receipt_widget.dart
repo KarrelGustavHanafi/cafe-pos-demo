@@ -21,6 +21,7 @@ class ReceiptWidget extends StatelessWidget {
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
 
     return Container(
+      key: const Key('thermal-receipt'),
       constraints: BoxConstraints(maxWidth: maxWidth ?? 360),
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
       decoration: BoxDecoration(

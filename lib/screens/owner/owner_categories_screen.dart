@@ -159,7 +159,7 @@ class _OwnerCategoriesScreenState extends State<OwnerCategoriesScreen> {
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                         ),
                         Text(
-                          'Kategori digunakan oleh kasir dan pelanggan untuk menemukan produk dengan cepat.',
+                          'Kategori digunakan oleh kasir untuk menemukan produk dengan cepat.',
                           style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                         ),
                       ],

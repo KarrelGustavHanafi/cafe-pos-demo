@@ -47,6 +47,24 @@ class MockTelegramService implements TelegramService {
   }
 
   @override
+  Future<TelegramSendResult> sendTransactionNotification(TransactionNotifData data) async {
+    final text = formatter.formatTransactionNotification(data);
+    return sendMessage(text);
+  }
+
+  @override
+  Future<TelegramSendResult> sendInventoryUpdate(InventoryUpdateData data) async {
+    final text = formatter.formatInventoryUpdate(data);
+    return sendMessage(text);
+  }
+
+  @override
+  Future<TelegramSendResult> sendShiftOpen(ShiftOpenData data) async {
+    final text = formatter.formatShiftOpen(data);
+    return sendMessage(text);
+  }
+
+  @override
   Future<TelegramSendResult> sendDailyReport(DailyReportData report) async {
     final text = formatter.formatDailyReport(report);
     return sendMessage(text);

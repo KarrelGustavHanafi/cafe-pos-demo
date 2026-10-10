@@ -6,6 +6,7 @@ import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../services/payment/payment_service.dart';
 import '../../services/payment/qris_payment_service.dart';
+import '../../utils/shift_sale_guard.dart';
 
 enum QrisSimulationStep {
   showQr,
@@ -129,11 +130,27 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final paidAmount = _selectedMethod == PaymentMethod.cash ? _cashTendered : total;
     final changeAmount = _selectedMethod == PaymentMethod.cash ? _changeAmount : 0;
 
-    widget.pos.completePayment(
-      method: _selectedMethod,
-      paidAmount: paidAmount,
-      changeAmount: changeAmount,
-    );
+    try {
+      widget.pos.completePayment(
+        method: _selectedMethod,
+        paidAmount: paidAmount,
+        changeAmount: changeAmount,
+      );
+    } on PosSaleBlockedException catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.hideCurrentSnackBar();
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
 
     if (mounted) {
       setState(() => _isProcessing = false);

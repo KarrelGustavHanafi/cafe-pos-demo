@@ -28,7 +28,6 @@ import 'package:cafe_pos_demo/screens/owner/owner_products_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_categories_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_inventory_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_tables_screen.dart';
-import 'package:cafe_pos_demo/screens/owner/owner_customers_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_reports_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_shifts_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_settings_screen.dart';
@@ -109,11 +108,10 @@ void main() {
           pos: p,
           onViewReceipt: () {},
           onNewOrder: () {},
-          onGoToOwnerDashboard: () {},
           onGoToCashier: () {},
         ),
     'ReceiptScreen': (p) =>
-        ReceiptScreen(pos: p, onBackToCashier: () {}, onGoToOwnerDashboard: () {}),
+        ReceiptScreen(pos: p, onBackToCashier: () {}),
     'OwnerDashboard': (p) => OwnerDashboard(
           pos: p,
           onViewSalesReport: () {},
@@ -130,7 +128,6 @@ void main() {
     'OwnerCategoriesScreen': (p) => OwnerCategoriesScreen(pos: p),
     'OwnerInventoryScreen': (p) => OwnerInventoryScreen(pos: p),
     'OwnerTablesScreen': (p) => OwnerTablesScreen(pos: p),
-    'OwnerCustomersScreen': (p) => OwnerCustomersScreen(pos: p),
     'OwnerReportsScreen': (p) => OwnerReportsScreen(pos: p),
     'OwnerShiftsScreen': (p) => OwnerShiftsScreen(pos: p),
     'OwnerSettingsScreen': (p) => OwnerSettingsScreen(pos: p),

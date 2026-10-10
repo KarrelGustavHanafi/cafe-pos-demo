@@ -198,7 +198,7 @@ void main() {
       expect(reloadedPos.businessConfig.receiptFooter, 'Terima kasih telah singgah di Kopi Nusantara!');
     });
 
-    test('7. Telegram config persists across save and load', () async {
+    test('7. Telegram config persists across save and load (relay mode strips botToken)', () async {
       final storage = LocalAppStorage();
       final pos = PosProvider(storage: storage);
       await pos.loadPersistedConfig();
@@ -225,7 +225,32 @@ void main() {
       expect(t.endpoint, 'https://relay.caffe.id/webhook');
       expect(t.integrationMode, TelegramIntegrationMode.relayWebhook);
       expect(t.testMode, isFalse);
-      expect(t.botToken, 'demo_token_only');
+      // Security: botToken is intentionally NOT persisted in relayWebhook mode
+      expect(t.botToken, isNull);
+    });
+
+    test('7b. Telegram botToken persists in directBotApi (sandbox) mode', () async {
+      final storage = LocalAppStorage();
+      final pos = PosProvider(storage: storage);
+      await pos.loadPersistedConfig();
+
+      final sandboxTelegram = const TelegramConfig(
+        enabled: true,
+        botUsername: '@SandboxBot',
+        chatId: '-100111222333',
+        integrationMode: TelegramIntegrationMode.directBotApi,
+        testMode: true,
+        botToken: 'sandbox_test_token',
+      );
+
+      await pos.updateBusinessConfig(pos.businessConfig.copyWith(telegramConfig: sandboxTelegram));
+
+      final reloadedPos = PosProvider(storage: storage);
+      await reloadedPos.loadPersistedConfig();
+
+      final t = reloadedPos.businessConfig.telegramConfig;
+      expect(t.integrationMode, TelegramIntegrationMode.directBotApi);
+      expect(t.botToken, 'sandbox_test_token');
     });
 
     test('8. QRIS config persists across save and load', () async {

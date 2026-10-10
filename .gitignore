@@ -54,3 +54,6 @@ app.*.map.json
 # Remotion motion design workspace
 remotion/node_modules/
 
+# Telegram Worker
+telegram-worker/node_modules/
+telegram-worker/.dev.vars

@@ -10,11 +10,13 @@ class TelegramBotService implements TelegramService {
   final TelegramConfig config;
   final TelegramFormatter formatter;
   final http.Client _httpClient;
+  final bool isPublicDemo;
 
   TelegramBotService({
     required this.config,
     TelegramFormatter? formatter,
     http.Client? httpClient,
+    this.isPublicDemo = true,
   })  : formatter = formatter ?? TelegramFormatter(),
         _httpClient = httpClient ?? http.Client();
 
@@ -37,9 +39,18 @@ class TelegramBotService implements TelegramService {
       );
     }
 
+    // Safety check: prevent Direct Bot API in public demo mode
+    if (isPublicDemo && config.integrationMode == TelegramIntegrationMode.directBotApi) {
+      return TelegramSendResult.success(
+        message: 'Pesan disimulasikan ke Telegram (Direct Bot API dinonaktifkan di mode demo publik).',
+        messageId: DateTime.now().millisecondsSinceEpoch,
+        rawResponse: {'ok': true, 'simulated': true, 'publicDemoMode': true},
+      );
+    }
+
     // 1. Mock simulation mode
     if (config.integrationMode == TelegramIntegrationMode.mockSimulation) {
-      await Future.delayed(const Duration(milliseconds: 300));
+      // No delay in test environments to avoid timer cleanup issues
       return TelegramSendResult.success(
         message: 'Pesan berhasil disimulasikan ke Telegram (Simulasi Client POS).',
         messageId: DateTime.now().millisecondsSinceEpoch,
@@ -106,7 +117,9 @@ class TelegramBotService implements TelegramService {
       }
 
       try {
-        final uri = Uri.parse(endpoint);
+        // Always use /telegram/send — the worker handles the bot token
+        final sendUrl = endpoint.endsWith('/') ? '${endpoint}telegram/send' : '$endpoint/telegram/send';
+        final uri = Uri.parse(sendUrl);
         final response = await _httpClient
             .post(
               uri,
@@ -114,20 +127,24 @@ class TelegramBotService implements TelegramService {
               body: jsonEncode({
                 'chatId': config.chatId.trim(),
                 'message': text,
-                'botUsername': config.botUsername,
-                'source': 'caffe_pos_web',
               }),
             )
-            .timeout(const Duration(seconds: 8));
+            .timeout(const Duration(seconds: 10));
 
-        if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = jsonDecode(response.body);
+        if (response.statusCode >= 200 && response.statusCode < 300 && data['ok'] == true) {
+          final msgId = data['messageId'] as int?;
           return TelegramSendResult.success(
-            message: 'Laporan sukses diteruskan melalui Secure Relay ke Telegram.',
+            message: data['message']?.toString() ?? 'Laporan sukses diteruskan melalui Secure Relay ke Telegram.',
+            messageId: msgId,
+            rawResponse: data,
           );
         } else {
+          final errMsg = data['error']?.toString() ?? 'Relay error';
           return TelegramSendResult.failure(
-            message: 'Relay Webhook mengembalikan kode ${response.statusCode}: ${response.body}',
+            message: 'Relay Webhook (${response.statusCode}): $errMsg',
             statusCode: response.statusCode,
+            rawResponse: data,
           );
         }
       } catch (e) {
@@ -142,6 +159,24 @@ class TelegramBotService implements TelegramService {
       message: 'Mode integrasi Telegram tidak dikenali.',
       statusCode: 400,
     );
+  }
+
+  @override
+  Future<TelegramSendResult> sendTransactionNotification(TransactionNotifData data) async {
+    final text = formatter.formatTransactionNotification(data);
+    return sendMessage(text);
+  }
+
+  @override
+  Future<TelegramSendResult> sendInventoryUpdate(InventoryUpdateData data) async {
+    final text = formatter.formatInventoryUpdate(data);
+    return sendMessage(text);
+  }
+
+  @override
+  Future<TelegramSendResult> sendShiftOpen(ShiftOpenData data) async {
+    final text = formatter.formatShiftOpen(data);
+    return sendMessage(text);
   }
 
   @override
@@ -164,6 +199,60 @@ class TelegramBotService implements TelegramService {
 
   @override
   Future<TelegramSendResult> testConnection() async {
+    // For relay mode, use the dedicated /telegram/test endpoint
+    if (config.integrationMode == TelegramIntegrationMode.relayWebhook) {
+      final endpoint = config.endpoint.trim();
+      if (endpoint.isEmpty) {
+        return TelegramSendResult.failure(
+          message: 'Endpoint secure relay belum diatur.',
+          statusCode: 400,
+        );
+      }
+
+      if (config.chatId.trim().isEmpty) {
+        return TelegramSendResult.failure(
+          message: 'Chat ID Telegram belum diatur.',
+          statusCode: 400,
+        );
+      }
+
+      try {
+        final testUrl = endpoint.endsWith('/') ? '${endpoint}telegram/test' : '$endpoint/telegram/test';
+        final uri = Uri.parse(testUrl);
+        final response = await _httpClient
+            .post(
+              uri,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'chatId': config.chatId.trim(),
+              }),
+            )
+            .timeout(const Duration(seconds: 10));
+
+        final data = jsonDecode(response.body);
+        if (response.statusCode >= 200 && response.statusCode < 300 && data['ok'] == true) {
+          return TelegramSendResult.success(
+            message: data['message']?.toString() ?? 'Koneksi Telegram via Secure Relay berhasil.',
+            messageId: data['messageId'] as int?,
+            rawResponse: data,
+          );
+        } else {
+          final errMsg = data['error']?.toString() ?? 'Relay test error';
+          return TelegramSendResult.failure(
+            message: 'Relay Test (${response.statusCode}): $errMsg',
+            statusCode: response.statusCode,
+            rawResponse: data,
+          );
+        }
+      } catch (e) {
+        return TelegramSendResult.failure(
+          message: 'Gagal menghubungi Secure Relay untuk uji koneksi: $e',
+          statusCode: 502,
+        );
+      }
+    }
+
+    // For mock and direct modes, send a test message through sendMessage
     final now = DateTime.now();
     final testMsg = '🔔 Uji Coba Integrasi CAFFE POS\n'
         'Status: Terhubung OK\n'

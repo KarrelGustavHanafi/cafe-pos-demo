@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../models/order.dart';
+import '../../models/shift.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/shadcn_components.dart';
 import '../order/order_screen.dart';
 import '../order/table_selection_screen.dart';
 import '../checkout/payment_screen.dart';
@@ -10,6 +12,7 @@ import '../checkout/payment_success_screen.dart';
 import '../receipt/receipt_screen.dart';
 import '../shift/shift_closing_screen.dart';
 import 'cashier_orders_screen.dart';
+import '../../utils/shift_sale_guard.dart';
 
 class CashierShell extends StatefulWidget {
   final PosProvider pos;
@@ -31,6 +34,21 @@ class _CashierShellState extends State<CashierShell> {
   bool _isInPaymentSuccess = false;
   bool _isInReceipt = false;
   Order? _viewingOrder;
+
+  /// Single place for blocked-shift feedback; the provider throws without
+  /// showing any UI, so the cashier sees exactly one message.
+  void _showBlockedSaleMessage(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.danger,
+      ),
+    );
+  }
 
   void _navigateToTab(int index) {
     setState(() {
@@ -75,14 +93,8 @@ class _CashierShellState extends State<CashierShell> {
           widget.pos.clearCart();
           setState(() {
             _isInPaymentSuccess = false;
-            _currentTab = 0; // Back to POS
+            _currentTab = 0;
           });
-        },
-        onGoToOwnerDashboard: () {
-          setState(() {
-            _isInPaymentSuccess = false;
-          });
-          widget.pos.switchUserRole(UserRole.owner);
         },
         onGoToCashier: () {
           setState(() {
@@ -102,13 +114,6 @@ class _CashierShellState extends State<CashierShell> {
             _isInReceipt = false;
             _viewingOrder = null;
           });
-        },
-        onGoToOwnerDashboard: () {
-          setState(() {
-            _isInReceipt = false;
-            _viewingOrder = null;
-          });
-          widget.pos.switchUserRole(UserRole.owner);
         },
       );
     }
@@ -132,126 +137,31 @@ class _CashierShellState extends State<CashierShell> {
 
     return Container(
       width: 220,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(right: BorderSide(color: AppColors.border, width: 1)),
+      decoration: BoxDecoration(
+        gradient: AppGradients.sidebarTint,
+        border: const Border(
+          right: BorderSide(color: AppColors.border, width: 1),
+        ),
+        boxShadow: AppShadows.sidebar,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Brand Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.primaryBorder),
-                  ),
-                  child: const Icon(Icons.coffee_rounded, color: AppColors.primary, size: 20),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'CAFFE',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.0,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        'Kasir POS',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 14),
+            child: BrandHeader(subtitle: 'Kasir POS'),
           ),
 
           const Divider(height: 1, color: AppColors.border),
 
-          // Cashier Profile & Shift Chip
+          // Cashier Profile & Shift Status
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceSubtle,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.borderLight),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: AppColors.primary,
-                        child: Text(
-                          user?.displayName.substring(0, 1) ?? 'K',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user?.displayName ?? 'Kasir',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                            ),
-                            const Text(
-                              'Role: Kasir',
-                              style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: shift.isClosed ? AppColors.dangerSoft : AppColors.successSoft,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      shift.isClosed ? 'Shift Ditutup' : 'Shift Aktif (Shift 1)',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: shift.isClosed ? AppColors.danger : AppColors.success,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _buildProfileCard(user, shift),
           ),
 
-          // Operational Navigation Tabs
+          // Operational Navigation
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -260,7 +170,9 @@ class _CashierShellState extends State<CashierShell> {
                   index: 0,
                   icon: Icons.point_of_sale_rounded,
                   label: 'POS / Pesanan',
-                  badge: widget.pos.cartItemCount > 0 ? '${widget.pos.cartItemCount}' : null,
+                  badge: widget.pos.cartItemCount > 0
+                      ? '${widget.pos.cartItemCount}'
+                      : null,
                 ),
                 _buildNavItem(
                   index: 1,
@@ -283,7 +195,7 @@ class _CashierShellState extends State<CashierShell> {
             ),
           ),
 
-          // Presenter Demo Switch & Logout Action
+          // Demo Switch & Logout
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
@@ -293,11 +205,20 @@ class _CashierShellState extends State<CashierShell> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 OutlinedButton.icon(
-                  onPressed: () => widget.pos.switchUserRole(UserRole.owner),
-                  icon: const Icon(Icons.insights_rounded, size: 15, color: AppColors.primary),
+                  onPressed: () =>
+                      widget.pos.switchUserRole(UserRole.owner),
+                  icon: const Icon(
+                    Icons.insights_rounded,
+                    size: 15,
+                    color: AppColors.primary,
+                  ),
                   label: const Text(
                     'Beralih ke Owner (Demo)',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryDark,
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -309,14 +230,141 @@ class _CashierShellState extends State<CashierShell> {
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: widget.onLogout,
-                  icon: const Icon(Icons.logout_rounded, size: 16, color: AppColors.textSecondary),
+                  icon: const Icon(
+                    Icons.logout_rounded,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
                   label: const Text(
                     'Keluar Akun',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     minimumSize: const Size(0, 44),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileCard(User? user, ShiftInfo shift) {
+    final isShiftActive = !shift.isClosed;
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primaryDark,
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    (user?.displayName ?? 'K').substring(0, 1).toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user?.displayName ?? 'Kasir',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const Text(
+                      'Role: Kasir',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          AnimatedContainer(
+            duration: AppAnimations.fast,
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isShiftActive
+                  ? AppColors.successSoft
+                  : AppColors.dangerSoft,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: (isShiftActive
+                        ? AppColors.success
+                        : AppColors.danger)
+                    .withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: isShiftActive
+                        ? AppColors.success
+                        : AppColors.danger,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  shift.isClosed ? 'Shift Ditutup' : 'Shift Aktif',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: isShiftActive
+                        ? const Color(0xFF047857)
+                        : AppColors.danger,
                   ),
                 ),
               ],
@@ -337,54 +385,85 @@ class _CashierShellState extends State<CashierShell> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: InkWell(
-        onTap: () => _navigateToTab(index),
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primarySoft : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? AppColors.primaryBorder : Colors.transparent,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
+        child: InkWell(
+          onTap: () => _navigateToTab(index),
+          borderRadius: BorderRadius.circular(10),
+          hoverColor: AppColors.primarySoft.withValues(alpha: 0.6),
+          child: AnimatedContainer(
+            duration: AppAnimations.fast,
+            curve: AppAnimations.defaultCurve,
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primarySoft : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isSelected
+                    ? AppColors.primaryBorder
+                    : Colors.transparent,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
+            ),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: AppAnimations.fast,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 17,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
                   ),
                 ),
-              ),
-              if (badge != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                const SizedBox(width: 10),
+                Expanded(
                   child: Text(
-                    badge,
+                    label,
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? Colors.white : AppColors.textSecondary,
+                      fontSize: 12.5,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: isSelected
+                          ? AppColors.primaryDark
+                          : AppColors.textPrimary,
                     ),
                   ),
                 ),
-            ],
+                if (badge != null)
+                  AnimatedContainer(
+                    duration: AppAnimations.fast,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -397,6 +476,8 @@ class _CashierShellState extends State<CashierShell> {
       onDestinationSelected: _navigateToTab,
       backgroundColor: AppColors.surface,
       indicatorColor: AppColors.primarySoft,
+      elevation: 0,
+      shadowColor: Colors.transparent,
       destinations: [
         NavigationDestination(
           icon: Badge(
@@ -434,7 +515,12 @@ class _CashierShellState extends State<CashierShell> {
           pos: widget.pos,
           onChangeTable: () => setState(() => _currentTab = 1),
           onCheckout: () {
-            widget.pos.prepareCheckoutOrder();
+            try {
+              widget.pos.prepareCheckoutOrder();
+            } on PosSaleBlockedException catch (e) {
+              _showBlockedSaleMessage(e.message);
+              return;
+            }
             setState(() => _isInPayment = true);
           },
         );
@@ -442,7 +528,7 @@ class _CashierShellState extends State<CashierShell> {
         content = TableSelectionScreen(
           pos: widget.pos,
           onTableSelected: () {
-            setState(() => _currentTab = 0); // Directly proceed to POS
+            setState(() => _currentTab = 0);
           },
         );
       case 2:
@@ -466,7 +552,7 @@ class _CashierShellState extends State<CashierShell> {
     }
 
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
+      duration: AppAnimations.normal,
       transitionBuilder: (child, animation) => FadeTransition(
         opacity: animation,
         child: child,

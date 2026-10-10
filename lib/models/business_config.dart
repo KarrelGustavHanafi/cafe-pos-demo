@@ -145,15 +145,30 @@ class TelegramConfig {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'enabled': enabled,
-        'botUsername': botUsername,
-        'chatId': chatId,
-        'endpoint': endpoint,
-        'integrationMode': integrationMode.name,
-        'testMode': testMode,
-        'botToken': botToken,
-      };
+  /// Returns the safe integration mode for public demo.
+  /// In public demo mode, Direct Bot API is automatically replaced with Mock Simulation.
+  TelegramIntegrationMode getSafeMode(bool isPublicDemo) {
+    if (isPublicDemo && integrationMode == TelegramIntegrationMode.directBotApi) {
+      return TelegramIntegrationMode.mockSimulation;
+    }
+    return integrationMode;
+  }
+
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'enabled': enabled,
+      'botUsername': botUsername,
+      'chatId': chatId,
+      'endpoint': endpoint,
+      'integrationMode': integrationMode.name,
+      'testMode': testMode,
+    };
+    // Only persist botToken for sandbox/direct mode — never for production relay
+    if (integrationMode != TelegramIntegrationMode.relayWebhook) {
+      json['botToken'] = botToken;
+    }
+    return json;
+  }
 
   factory TelegramConfig.fromJson(Map<String, dynamic> json) {
     bool parseBool(dynamic val, bool fallback) {
@@ -199,6 +214,7 @@ class BusinessConfig {
   final TelegramConfig telegramConfig;
   final String orderNumberPrefix;
   final int defaultLowStockThreshold;
+  final bool isPublicDemo;
 
   const BusinessConfig({
     this.businessName = 'CAFFE',
@@ -218,6 +234,7 @@ class BusinessConfig {
     this.telegramConfig = const TelegramConfig(),
     this.orderNumberPrefix = 'ORD',
     this.defaultLowStockThreshold = 15,
+    this.isPublicDemo = true,
   });
 
   double get taxRate => taxPercent / 100.0;
@@ -241,6 +258,7 @@ class BusinessConfig {
     TelegramConfig? telegramConfig,
     String? orderNumberPrefix,
     int? defaultLowStockThreshold,
+    bool? isPublicDemo,
   }) {
     return BusinessConfig(
       businessName: businessName ?? this.businessName,
@@ -260,6 +278,7 @@ class BusinessConfig {
       telegramConfig: telegramConfig ?? this.telegramConfig,
       orderNumberPrefix: orderNumberPrefix ?? this.orderNumberPrefix,
       defaultLowStockThreshold: defaultLowStockThreshold ?? this.defaultLowStockThreshold,
+      isPublicDemo: isPublicDemo ?? this.isPublicDemo,
     );
   }
 
@@ -281,6 +300,7 @@ class BusinessConfig {
         'telegramConfig': telegramConfig.toJson(),
         'orderNumberPrefix': orderNumberPrefix,
         'defaultLowStockThreshold': defaultLowStockThreshold,
+        'isPublicDemo': isPublicDemo,
       };
 
   factory BusinessConfig.fromJson(Map<String, dynamic> json) {
@@ -339,6 +359,7 @@ class BusinessConfig {
       telegramConfig: rawTelegram != null ? TelegramConfig.fromJson(rawTelegram) : const TelegramConfig(),
       orderNumberPrefix: json['orderNumberPrefix']?.toString() ?? 'ORD',
       defaultLowStockThreshold: parseInt(json['defaultLowStockThreshold'], 15),
+      isPublicDemo: parseBool(json['isPublicDemo'], true),
     );
   }
 
