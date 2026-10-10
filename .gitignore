@@ -57,3 +57,10 @@ remotion/node_modules/
 # Telegram Worker
 telegram-worker/node_modules/
 telegram-worker/.dev.vars
+
+# Cloudflare Wrangler local secrets (root and nested; .dev.vars holds the
+# TELEGRAM_BOT_TOKEN secret and must never be committed)
+.dev.vars
+.dev.vars.*
+# Keep legitimate commit-safe templates trackable
+!.dev.vars.example
