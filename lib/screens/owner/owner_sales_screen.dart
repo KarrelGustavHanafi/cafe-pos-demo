@@ -13,23 +13,41 @@ class OwnerSalesScreen extends StatefulWidget {
 }
 
 class _OwnerSalesScreenState extends State<OwnerSalesScreen> {
-  int _selectedPeriod = 0; // 0: Harian (Daily), 1: Mingguan (Weekly), 2: Bulanan (Monthly)
+  // 0: Hari Ini, 1: 7 Hari Terakhir, 2: 30 Hari Terakhir.
+  // The tabs are rolling calendar-date windows, not calendar week/month.
+  int _selectedPeriod = 0;
+
+  ReportPeriod get _period => switch (_selectedPeriod) {
+        0 => ReportPeriod.today,
+        1 => ReportPeriod.last7Days,
+        _ => ReportPeriod.last30Days,
+      };
 
   @override
   Widget build(BuildContext context) {
-    // Multipliers for believable realistic period simulation
-    final multiplier = _selectedPeriod == 0 ? 1.0 : (_selectedPeriod == 1 ? 6.8 : 28.5);
+    // Every figure below is derived from the orders that actually exist in the
+    // selected period. Nothing is scaled or estimated, so two periods that
+    // report the same numbers simply mean no orders were recorded between them.
+    final period = _period;
+    final paidOrders = widget.pos.getPaidOrdersForPeriod(period);
 
-    final totalSales = (widget.pos.todaySalesTotal * multiplier).round();
-    final grossSales = (widget.pos.todayGrossSales * multiplier).round();
-    final taxTotal = (widget.pos.todayTaxTotal * multiplier).round();
-    final serviceTotal = (widget.pos.todayServiceTotal * multiplier).round();
-    final netSales = (widget.pos.todayNetSales * multiplier).round();
-    final txCount = (widget.pos.todayTransactionsCount * multiplier).round();
-    final aov = txCount > 0 ? (totalSales / txCount).round() : 0;
-    final totalItems = (widget.pos.todayTotalItemsSold * multiplier).round();
+    final totalSales = widget.pos.getSalesTotalForPeriod(period);
+    final grossSales = paidOrders.fold<int>(0, (sum, o) => sum + o.subtotal);
+    final taxTotal = paidOrders.fold<int>(0, (sum, o) => sum + o.tax);
+    final serviceTotal = paidOrders.fold<int>(0, (sum, o) => sum + o.serviceCharge);
+    final netSales = grossSales;
+    final txCount = widget.pos.getTransactionsCountForPeriod(period);
+    final aov = widget.pos.getAverageTransactionForPeriod(period);
+    final totalItems = widget.pos.getTotalItemsSoldForPeriod(period);
 
-    final periodLabel = _selectedPeriod == 0 ? 'Hari Ini' : (_selectedPeriod == 1 ? '7 Hari Terakhir' : 'Bulan Ini');
+    final qrisSales = widget.pos.getQrisSalesForPeriod(period);
+    final cashSales = widget.pos.getCashSalesForPeriod(period);
+    final debitSales = widget.pos.getDebitSalesForPeriod(period);
+    final topProducts = widget.pos.getTopSellingProductsForPeriod(period);
+
+    final periodLabel = _selectedPeriod == 0
+        ? 'Hari Ini'
+        : (_selectedPeriod == 1 ? '7 Hari Terakhir' : '30 Hari Terakhir');
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -67,9 +85,9 @@ class _OwnerSalesScreenState extends State<OwnerSalesScreen> {
                     );
                     final toggle = SegmentedButton<int>(
                       segments: const [
-                        ButtonSegment(value: 0, label: Text('Harian')),
-                        ButtonSegment(value: 1, label: Text('Mingguan')),
-                        ButtonSegment(value: 2, label: Text('Bulanan')),
+                        ButtonSegment(value: 0, label: Text('Hari Ini')),
+                        ButtonSegment(value: 1, label: Text('7 Hari')),
+                        ButtonSegment(value: 2, label: Text('30 Hari')),
                       ],
                       selected: {_selectedPeriod},
                       onSelectionChanged: (set) => setState(() => _selectedPeriod = set.first),
@@ -96,6 +114,31 @@ class _OwnerSalesScreenState extends State<OwnerSalesScreen> {
                     );
                   },
                 ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Demo Limitation Disclosure
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Riwayat transaksi pada mode demo tersimpan di memori saja dan hilang saat aplikasi dimuat ulang. Jika periode 7 atau 30 hari menampilkan angka yang sama dengan hari ini, itu karena belum ada transaksi pada periode sebelumnya.',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -209,11 +252,11 @@ class _OwnerSalesScreenState extends State<OwnerSalesScreen> {
                     const SizedBox(height: 12),
                     const Divider(height: 1, color: AppColors.border),
                     const SizedBox(height: 10),
-                    _buildBreakdownRow('QRIS (BCA, GoPay, OVO, Dana)', AppCurrency.format((widget.pos.todayQrisSales * multiplier).round()), false),
+                    _buildBreakdownRow('QRIS (BCA, GoPay, OVO, Dana)', AppCurrency.format(qrisSales), false),
                     const SizedBox(height: 8),
-                    _buildBreakdownRow('Tunai / Cash', AppCurrency.format((widget.pos.todayCashSales * multiplier).round()), false),
+                    _buildBreakdownRow('Tunai / Cash', AppCurrency.format(cashSales), false),
                     const SizedBox(height: 8),
-                    _buildBreakdownRow('Debit Card / EDC', AppCurrency.format((widget.pos.todayDebitSales * multiplier).round()), false),
+                    _buildBreakdownRow('Debit Card / EDC', AppCurrency.format(debitSales), false),
                   ],
                 ),
               ),
@@ -244,8 +287,8 @@ class _OwnerSalesScreenState extends State<OwnerSalesScreen> {
                     const SizedBox(height: 12),
                     const Divider(height: 1, color: AppColors.border),
                     const SizedBox(height: 8),
-                    ...widget.pos.topSellingProducts.take(5).map((entry) {
-                      final estSales = (entry.value * multiplier).round();
+                    ...topProducts.take(5).map((entry) {
+                      final soldCount = entry.value;
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         child: Row(
@@ -266,7 +309,7 @@ class _OwnerSalesScreenState extends State<OwnerSalesScreen> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                '$estSales terjual',
+                                '$soldCount terjual',
                                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
                               ),
                             ),

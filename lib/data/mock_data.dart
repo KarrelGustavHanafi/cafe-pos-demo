@@ -1,6 +1,5 @@
 import '../models/user.dart';
 import '../models/product.dart';
-import '../models/table.dart';
 import '../models/cart_item.dart';
 import '../models/order.dart';
 import '../models/shift.dart';
@@ -519,19 +518,6 @@ class MockData {
     ];
   }
 
-  static List<CafeTable> getInitialTables() {
-    return [
-      CafeTable(id: 'tbl-1', number: 'A01', status: TableStatus.available, capacity: 4),
-      CafeTable(id: 'tbl-2', number: 'A02', status: TableStatus.available, capacity: 2),
-      CafeTable(id: 'tbl-3', number: 'A03', status: TableStatus.occupied, capacity: 4),
-      CafeTable(id: 'tbl-4', number: 'A04', status: TableStatus.available, capacity: 6),
-      CafeTable(id: 'tbl-5', number: 'B01', status: TableStatus.occupied, capacity: 2),
-      CafeTable(id: 'tbl-6', number: 'B02', status: TableStatus.available, capacity: 4),
-      CafeTable(id: 'tbl-7', number: 'B03', status: TableStatus.available, capacity: 4),
-      CafeTable(id: 'tbl-8', number: 'B04', status: TableStatus.available, capacity: 6),
-      CafeTable(id: 'tbl-9', number: 'VIP-1', status: TableStatus.available, capacity: 8),
-    ];
-  }
 
   static ShiftInfo getInitialShift() {
     final now = DateTime.now();
@@ -648,6 +634,13 @@ class MockData {
   }
 
 
+  /// Seeded audit rows for the demo.
+  ///
+  /// These are sample data, not real operations. Their [reason] text is
+  /// prefixed with [samplePrefix] so the inventory history can label them
+  /// honestly instead of presenting them as genuine adjustments.
+  static const String samplePrefix = '[Data contoh]';
+
   static List<StockAdjustment> getInitialStockAdjustments() {
     final now = DateTime.now();
     return [
@@ -659,7 +652,7 @@ class MockData {
         quantity: 25,
         previousStock: 15,
         newStock: 40,
-        reason: 'Restock biji kopi house blend & susu fresh',
+        reason: '$samplePrefix Restock biji kopi house blend & susu fresh',
         timestamp: now.subtract(const Duration(hours: 6)),
       ),
       StockAdjustment(
@@ -670,7 +663,7 @@ class MockData {
         quantity: 2,
         previousStock: 10,
         newStock: 8,
-        reason: 'Bahan rusak/terbuka kemasan saat penyimpanan',
+        reason: '$samplePrefix Bahan rusak/terbuka kemasan saat penyimpanan',
         timestamp: now.subtract(const Duration(hours: 4)),
       ),
       StockAdjustment(
@@ -681,7 +674,7 @@ class MockData {
         quantity: 2000,
         previousStock: 3000,
         newStock: 5000,
-        reason: 'Pengiriman supplier biji kopi arabika',
+        reason: '$samplePrefix Pengiriman supplier biji kopi arabika',
         timestamp: now.subtract(const Duration(days: 1)),
         unit: 'gram',
         isRawMaterial: true,

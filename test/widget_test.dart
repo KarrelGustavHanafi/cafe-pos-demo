@@ -33,8 +33,6 @@ void main() {
       final pos = PosProvider();
       pos.login('cashier', 'cashier123');
 
-      final tableA01 = pos.tables.firstWhere((t) => t.number == 'A01');
-      pos.selectTable(tableA01);
       pos.loadDemoQuickOrder();
 
       final kopiSusuBefore = pos.products.firstWhere((p) => p.name == 'Kopi Susu Gula Aren').stock;
@@ -56,9 +54,6 @@ void main() {
       expect(kopiSusuAfter, kopiSusuBefore - 2);
       expect(friesAfter, friesBefore - 1);
 
-      // Verify table A01 status is now occupied
-      final tableA01After = pos.tables.firstWhere((t) => t.number == 'A01');
-      expect(tableA01After.isOccupied, isTrue);
     });
   });
 
@@ -94,7 +89,6 @@ void main() {
       expect(find.text('Kasir POS'), findsOneWidget);
       expect(find.text('Role: Kasir'), findsOneWidget);
       expect(find.text('POS / Pesanan'), findsOneWidget);
-      expect(find.text('Denah Meja'), findsOneWidget);
       expect(find.text('Shift Kasir'), findsOneWidget);
 
       // Should NOT see Owner Dashboard or Owner business analytics
@@ -151,10 +145,8 @@ void main() {
       expect(addedProduct.stock, 20);
       expect(addedProduct.price, 22000);
 
-      // Step 9-15: Cashier opens POS, selects table, adds Strawberry Matcha + French Fries
+      // Step 9-15: Cashier opens POS, adds Strawberry Matcha + French Fries
       pos.login('cashier', 'cashier123');
-      final tableB02 = pos.tables.firstWhere((t) => t.number == 'B02');
-      pos.selectTable(tableB02);
 
       final fries = pos.products.firstWhere((p) => p.name == 'French Fries');
       pos.addToCart(addedProduct, qty: 1);

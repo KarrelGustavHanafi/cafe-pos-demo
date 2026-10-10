@@ -5,8 +5,8 @@ import '../../models/shift.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shadcn_components.dart';
+import '../../widgets/demo_data_notice.dart';
 import '../order/order_screen.dart';
-import '../order/table_selection_screen.dart';
 import '../checkout/payment_screen.dart';
 import '../checkout/payment_success_screen.dart';
 import '../receipt/receipt_screen.dart';
@@ -29,7 +29,7 @@ class CashierShell extends StatefulWidget {
 }
 
 class _CashierShellState extends State<CashierShell> {
-  int _currentTab = 0; // 0: POS, 1: Meja, 2: Pesanan, 3: Shift
+  int _currentTab = 0; // 0: POS / Pesanan, 1: Pesanan Selesai, 2: Shift Kasir
   bool _isInPayment = false;
   bool _isInPaymentSuccess = false;
   bool _isInReceipt = false;
@@ -174,20 +174,15 @@ class _CashierShellState extends State<CashierShell> {
                       ? '${widget.pos.cartItemCount}'
                       : null,
                 ),
+
                 _buildNavItem(
                   index: 1,
-                  icon: Icons.table_restaurant_rounded,
-                  label: 'Denah Meja',
-                  badge: '${widget.pos.availableTablesCount} Meja',
-                ),
-                _buildNavItem(
-                  index: 2,
                   icon: Icons.receipt_long_rounded,
                   label: 'Pesanan Selesai',
                   badge: '${widget.pos.todayTransactionsCount}',
                 ),
                 _buildNavItem(
-                  index: 3,
+                  index: 2,
                   icon: Icons.lock_clock_rounded,
                   label: 'Shift Kasir',
                 ),
@@ -195,7 +190,9 @@ class _CashierShellState extends State<CashierShell> {
             ),
           ),
 
-          // Demo Switch & Logout
+          // Logout
+          // Owner access is deliberately NOT reachable from here: the owner
+          // must sign in through the login screen like any other role.
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
@@ -204,30 +201,6 @@ class _CashierShellState extends State<CashierShell> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () =>
-                      widget.pos.switchUserRole(UserRole.owner),
-                  icon: const Icon(
-                    Icons.insights_rounded,
-                    size: 15,
-                    color: AppColors.primary,
-                  ),
-                  label: const Text(
-                    'Beralih ke Owner (Demo)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryDark,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    minimumSize: const Size(0, 44),
-                    side: const BorderSide(color: AppColors.primaryBorder),
-                    backgroundColor: AppColors.primarySoft,
-                  ),
-                ),
-                const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: widget.onLogout,
                   icon: const Icon(
@@ -487,10 +460,6 @@ class _CashierShellState extends State<CashierShell> {
           ),
           label: 'POS',
         ),
-        const NavigationDestination(
-          icon: Icon(Icons.table_restaurant_rounded),
-          label: 'Meja',
-        ),
         NavigationDestination(
           icon: Badge(
             isLabelVisible: widget.pos.todayTransactionsCount > 0,
@@ -513,7 +482,6 @@ class _CashierShellState extends State<CashierShell> {
       case 0:
         content = OrderScreen(
           pos: widget.pos,
-          onChangeTable: () => setState(() => _currentTab = 1),
           onCheckout: () {
             try {
               widget.pos.prepareCheckoutOrder();
@@ -525,13 +493,6 @@ class _CashierShellState extends State<CashierShell> {
           },
         );
       case 1:
-        content = TableSelectionScreen(
-          pos: widget.pos,
-          onTableSelected: () {
-            setState(() => _currentTab = 0);
-          },
-        );
-      case 2:
         content = CashierOrdersScreen(
           pos: widget.pos,
           onViewReceipt: (Order order) {
@@ -541,7 +502,7 @@ class _CashierShellState extends State<CashierShell> {
             });
           },
         );
-      case 3:
+      case 2:
         content = ShiftClosingScreen(
           pos: widget.pos,
           onBackToDashboard: () => setState(() => _currentTab = 0),
@@ -551,16 +512,25 @@ class _CashierShellState extends State<CashierShell> {
         content = const SizedBox();
     }
 
-    return AnimatedSwitcher(
-      duration: AppAnimations.normal,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
-      child: KeyedSubtree(
-        key: ValueKey<int>(_currentTab),
-        child: content,
-      ),
+    // Demo data disclosure sits above every cashier tab so the limitation is
+    // visible during the core POS workflow without blocking it.
+    return Column(
+      children: [
+        const DemoDataNotice(compact: true),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: AppAnimations.normal,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: child,
+            ),
+            child: KeyedSubtree(
+              key: ValueKey<int>(_currentTab),
+              child: content,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

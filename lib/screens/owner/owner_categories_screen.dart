@@ -13,48 +13,24 @@ class OwnerCategoriesScreen extends StatefulWidget {
 }
 
 class _OwnerCategoriesScreenState extends State<OwnerCategoriesScreen> {
-  void _showAddCategoryDialog() {
-    final controller = TextEditingController();
+  /// Product categories are a fixed enum (see `ProductCategory`), so a
+  /// user-typed name cannot become a real category. Rather than pretend the
+  /// addition worked, this explains the limitation instead of adding anything.
+  void _showCategoryLimitationDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Tambah Kategori Menu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Masukkan nama kategori baru untuk mengelompokkan menu kafe.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Nama Kategori',
-                hintText: 'Contoh: Signature Drink / Bakery',
-                prefixIcon: Icon(Icons.category_outlined, size: 18),
-              ),
-            ),
-          ],
+        title: const Text('Kategori Dinamis Tidak Tersedia',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        content: const Text(
+          'Kategori menu pada mode demo bersifat tetap dan sudah ditentukan di dalam aplikasi, sehingga kategori baru tidak dapat dibuat dari layar ini. '
+          'Kategori yang tersedia saat ini tetap bisa digunakan mengelompokkan produk seperti biasa.',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                // In demo, we add to provider categories list
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Kategori "${controller.text.trim()}" berhasil ditambahkan!'),
-                    backgroundColor: AppColors.primaryDark,
-                  ),
-                );
-                Navigator.of(context).pop();
-              }
-            },
-            child: const Text('Tambah Kategori'),
-          ),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Mengerti')),
         ],
       ),
     );
@@ -113,13 +89,21 @@ class _OwnerCategoriesScreenState extends State<OwnerCategoriesScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ElevatedButton.icon(
-              onPressed: _showAddCategoryDialog,
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Tambah Kategori'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+            // This is an informational action, not an add action: it opens an
+            // explanation. The icon, label, styling and semantics all say so,
+            // and it is fully enabled because it does exactly what it promises.
+            child: Semantics(
+              button: true,
+              label:
+                  'Informasi kategori. Menambah kategori baru tidak tersedia.',
+              child: OutlinedButton.icon(
+                onPressed: _showCategoryLimitationDialog,
+                icon: const Icon(Icons.info_outline_rounded, size: 16),
+                label: const Text('Info Kategori'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryDark,
+                  side: const BorderSide(color: AppColors.primaryBorder),
+                ),
               ),
             ),
           ),
@@ -163,6 +147,33 @@ class _OwnerCategoriesScreenState extends State<OwnerCategoriesScreen> {
                           style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                         ),
                       ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Fixed-Category Limitation Notice
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSubtle,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lock_outline_rounded,
+                      color: AppColors.textSecondary, size: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Kategori bersifat tetap pada mode demo. Menambah kategori baru tidak tersedia, dan aplikasi tidak akan menampilkan pesan berhasil untuk tindakan yang tidak dijalankan.',
+                      style:
+                          TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     ),
                   ),
                 ],

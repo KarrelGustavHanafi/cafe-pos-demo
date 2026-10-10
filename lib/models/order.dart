@@ -21,6 +21,16 @@ enum OrderStatus {
 class Order {
   final String orderNumber;
   final String tableNumber;
+
+  /// Human-readable seating label.
+  ///
+  /// Seating is free-choice, so new orders carry `Takeaway` and must never be
+  /// rendered as "Meja Takeaway". Legacy orders that recorded a real table
+  /// (A03, B01, ...) still show it.
+  String get tableLabel => tableNumber.trim().isEmpty ||
+          tableNumber.toLowerCase() == 'takeaway'
+      ? 'Takeaway'
+      : 'Meja $tableNumber';
   final List<CartItem> items;
   final int subtotal;
   final int serviceCharge; // 5%

@@ -12,7 +12,6 @@ import 'package:cafe_pos_demo/theme/app_theme.dart';
 
 import 'package:cafe_pos_demo/screens/login_screen.dart';
 import 'package:cafe_pos_demo/screens/order/order_screen.dart';
-import 'package:cafe_pos_demo/screens/order/table_selection_screen.dart';
 import 'package:cafe_pos_demo/screens/checkout/payment_screen.dart';
 import 'package:cafe_pos_demo/screens/checkout/payment_success_screen.dart';
 import 'package:cafe_pos_demo/screens/receipt/receipt_screen.dart';
@@ -27,7 +26,6 @@ import 'package:cafe_pos_demo/screens/owner/owner_sales_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_products_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_categories_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_inventory_screen.dart';
-import 'package:cafe_pos_demo/screens/owner/owner_tables_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_reports_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_shifts_screen.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_settings_screen.dart';
@@ -95,9 +93,7 @@ void main() {
     'CashierShell': (p) => CashierShell(pos: p, onLogout: () {}),
     'OwnerShell': (p) => OwnerShell(pos: p, onLogout: () {}),
     'OrderScreen': (p) =>
-        OrderScreen(pos: p, onCheckout: () {}, onChangeTable: () {}),
-    'TableSelectionScreen': (p) =>
-        TableSelectionScreen(pos: p, onTableSelected: () {}),
+        OrderScreen(pos: p, onCheckout: () {}),
     'CashierOrdersScreen': (p) =>
         CashierOrdersScreen(pos: p, onViewReceipt: (_) {}),
     'ShiftClosingScreen': (p) =>
@@ -127,7 +123,6 @@ void main() {
     'OwnerProductsScreen': (p) => OwnerProductsScreen(pos: p),
     'OwnerCategoriesScreen': (p) => OwnerCategoriesScreen(pos: p),
     'OwnerInventoryScreen': (p) => OwnerInventoryScreen(pos: p),
-    'OwnerTablesScreen': (p) => OwnerTablesScreen(pos: p),
     'OwnerReportsScreen': (p) => OwnerReportsScreen(pos: p),
     'OwnerShiftsScreen': (p) => OwnerShiftsScreen(pos: p),
     'OwnerSettingsScreen': (p) => OwnerSettingsScreen(pos: p),

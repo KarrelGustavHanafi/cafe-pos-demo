@@ -47,7 +47,7 @@ class OwnerShiftsScreen extends StatelessWidget {
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                         ),
                         Text(
-                          'Monitoring pembukaan kasir, total omzet per shift, serta verifikasi selisih fisik kas tanpa mencampuri proses operasional POS.',
+                          'Monitoring pembukaan kasir, verifikasi selisih fisik kas, serta data yang tersimpan saat shift ditutup, tanpa mencampuri proses operasional POS.',
                           style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                         ),
                       ],
@@ -67,14 +67,28 @@ class OwnerShiftsScreen extends StatelessWidget {
     );
   }
 
+  /// Placeholder for figures the current data model cannot support.
+  ///
+  /// Closed shifts store no sales of their own and orders carry no shift
+  /// reference, so per-shift sales and the cash variance derived from them
+  /// cannot be calculated honestly. Showing a number here would be invented.
+  static const String _unavailable = 'Tidak tersedia';
+
   Widget _buildShiftCard(BuildContext context, ShiftInfo shift) {
     final isOpen = !shift.isClosed;
-    final totalShiftSales = isOpen ? pos.todaySalesTotal : 1592000;
-    final cashSales = isOpen ? pos.todayCashSales : 552000;
-    final qrisSales = isOpen ? pos.todayQrisSales : 1040000;
-    final expectedCash = shift.startingCash + cashSales;
-    final actualCash = isOpen ? expectedCash : (shift.actualEndingCash ?? expectedCash);
-    final variance = actualCash - expectedCash;
+
+    // An open shift is the live one, so today's running figures apply to it.
+    // A closed shift has no order linkage, so only the values recorded at
+    // closing time itself are real.
+    final totalShiftSales = isOpen ? pos.todaySalesTotal : null;
+    final cashSales = isOpen ? pos.todayCashSales : null;
+    final qrisSales = isOpen ? pos.todayQrisSales : null;
+    final expectedCash = isOpen ? shift.startingCash + pos.todayCashSales : null;
+    final actualCash =
+        isOpen ? expectedCash : (shift.actualEndingCash ?? expectedCash);
+    final variance = (expectedCash != null && actualCash != null)
+        ? actualCash - expectedCash
+        : null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
@@ -170,19 +184,62 @@ class OwnerShiftsScreen extends StatelessWidget {
                   childAspectRatio: isWide ? 2.2 : 2.0,
                   children: [
                     _buildSubMetric('Modal Kas Awal', AppCurrency.format(shift.startingCash)),
-                    _buildSubMetric('Total Penjualan Shift', AppCurrency.format(totalShiftSales)),
-                    _buildSubMetric('Penjualan Tunai', AppCurrency.format(cashSales)),
-                    _buildSubMetric('Penjualan QRIS', AppCurrency.format(qrisSales)),
-                    _buildSubMetric('Kas Diharapkan', AppCurrency.format(expectedCash)),
-                    _buildSubMetric('Kas Aktual Fisik', AppCurrency.format(actualCash)),
+                    _buildSubMetric(
+                      'Total Penjualan Shift',
+                      totalShiftSales != null
+                          ? AppCurrency.format(totalShiftSales)
+                          : _unavailable,
+                    ),
+                    _buildSubMetric(
+                      'Penjualan Tunai',
+                      cashSales != null
+                          ? AppCurrency.format(cashSales)
+                          : _unavailable,
+                    ),
+                    _buildSubMetric(
+                      'Penjualan QRIS',
+                      qrisSales != null
+                          ? AppCurrency.format(qrisSales)
+                          : _unavailable,
+                    ),
+                    _buildSubMetric(
+                      'Kas Diharapkan',
+                      expectedCash != null
+                          ? AppCurrency.format(expectedCash)
+                          : _unavailable,
+                    ),
+                    _buildSubMetric(
+                      'Kas Aktual Fisik',
+                      actualCash != null
+                          ? AppCurrency.format(actualCash)
+                          : _unavailable,
+                    ),
                     _buildSubMetric(
                       'Selisih Kas',
-                      variance == 0 ? 'Cocok (Rp0)' : AppCurrency.format(variance),
-                      color: variance == 0 ? AppColors.success : AppColors.warning,
+                      variance == null
+                          ? _unavailable
+                          : (variance == 0
+                              ? 'Cocok (Rp0)'
+                              : AppCurrency.format(variance)),
+                      color: variance == null
+                          ? AppColors.textSecondary
+                          : (variance == 0
+                              ? AppColors.success
+                              : AppColors.warning),
                     ),
                     _buildSubMetric(
                       'Waktu Buka',
                       '${shift.startTime.hour.toString().padLeft(2, '0')}:${shift.startTime.minute.toString().padLeft(2, '0')}',
+                    ),
+                    _buildSubMetric(
+                      'Waktu Tutup',
+                      // An open shift has no closing time yet. Say so plainly
+                      // instead of showing an "unavailable" placeholder that
+                      // reads like missing data. Never infer a time from the
+                      // current clock.
+                      shift.closedAt != null
+                          ? '${shift.closedAt!.hour.toString().padLeft(2, '0')}:${shift.closedAt!.minute.toString().padLeft(2, '0')}'
+                          : (isOpen ? 'Belum ditutup' : _unavailable),
                     ),
                   ],
                 );

@@ -108,7 +108,7 @@ Future<void> triggerBrowserPrint({
     <div class="row"><span>No:</span><span class="bold">${escapeHtml(orderNumber)}</span></div>
     <div class="row"><span>Waktu:</span><span>${escapeHtml(dateTime)}</span></div>
     <div class="row"><span>Kasir:</span><span>${escapeHtml(cashierName)}</span></div>
-    <div class="row"><span>Meja:</span><span>${escapeHtml(tableNumber)}</span></div>
+    ${tableNumber.trim().isNotEmpty && tableNumber.toLowerCase() != 'takeaway' ? '<div class="row"><span>Meja:</span><span>${escapeHtml(tableNumber)}</span></div>' : '<div class="row"><span>Tipe:</span><span>Takeaway</span></div>'}
     
     <div class="divider"></div>
   ''';

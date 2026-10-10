@@ -618,29 +618,34 @@ void main() {
       expect(rows.length, 1);
     });
 
-    test('H-2: rollback restores the dine-in table to its pre-sale state', () {
-      final table = pos.tables.firstWhere((t) => t.number == 'A02');
-      pos.selectTable(table);
-      final statusBefore = table.status;
-      final orderIdBefore = table.currentOrderId;
+      test('H-2: rollback restores product stock to its pre-sale state', () {
+        // Seating is free-choice, so there is no table state to roll back.
+        // This asserts the same atomicity guarantee on the data that is still
+        // committed: a failure after inventory apply must leave stock, orders
+        // and adjustment history exactly as they were.
+        final stockBefore = pos.products.firstWhere((p) => p.id == 'PRD-001').stock;
+        final ordersBefore = pos.orders.length;
+        final adjustmentsBefore = pos.stockAdjustments.length;
 
-      pos.addToCart(coffee(), qty: 1);
-      pos.prepareCheckoutOrder();
+        pos.addToCart(coffee(), qty: 1);
+        pos.prepareCheckoutOrder();
 
-      pos.debugThrowAfterInventoryApply = () => throw StateError('boom');
-      expect(
-        () => pos.completePayment(
-          method: PaymentMethod.cash,
-          paidAmount: pos.cartGrandTotal,
-          changeAmount: 0,
-        ),
-        throwsA(isA<StateError>()),
-      );
-      pos.debugThrowAfterInventoryApply = null;
+        pos.debugThrowAfterInventoryApply = () => throw StateError('boom');
+        expect(
+          () => pos.completePayment(
+            method: PaymentMethod.cash,
+            paidAmount: pos.cartGrandTotal,
+            changeAmount: 0,
+          ),
+          throwsA(isA<StateError>()),
+        );
+        pos.debugThrowAfterInventoryApply = null;
 
-      expect(table.status, statusBefore);
-      expect(table.currentOrderId, orderIdBefore);
-    });
+        expect(
+            pos.products.firstWhere((p) => p.id == 'PRD-001').stock, stockBefore);
+        expect(pos.orders.length, ordersBefore);
+        expect(pos.stockAdjustments.length, adjustmentsBefore);
+      });
 
     // ================================================================
     // Task 4 - Defensive payment checks

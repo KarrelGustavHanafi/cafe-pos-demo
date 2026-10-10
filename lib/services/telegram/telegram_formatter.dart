@@ -36,8 +36,10 @@ class TelegramFormatter {
     buffer.writeln('Kasir: ${data.cashierName}');
     if (data.tableNumber != null &&
         data.tableNumber!.trim().isNotEmpty &&
-        data.tableNumber != 'Takeaway') {
+        data.tableNumber!.toLowerCase() != 'takeaway') {
       buffer.writeln('Meja: ${data.tableNumber}');
+    } else {
+      buffer.writeln('Tipe: Takeaway');
     }
     buffer.writeln();
 

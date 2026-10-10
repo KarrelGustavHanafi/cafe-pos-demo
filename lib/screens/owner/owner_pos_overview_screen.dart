@@ -9,7 +9,6 @@ class OwnerPosOverviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tables = pos.tables;
     final shift = pos.currentShift;
     final orders = pos.orders;
 
@@ -90,10 +89,10 @@ class OwnerPosOverviewScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Meja Terisi Saat Ini', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        const Text('Transaksi Hari Ini', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                         const SizedBox(height: 4),
                         Text(
-                          '${pos.occupiedTablesCount} / ${tables.length}',
+                          '${pos.todayTransactionsCount}',
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.warning),
                         ),
                       ],
@@ -149,62 +148,6 @@ class OwnerPosOverviewScreen extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // Live Table Floor Status
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Denah Meja Restoran (Live Floor Occupancy)',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: tables.map((t) {
-                        final isOcc = t.isOccupied;
-                        return Container(
-                          width: 80,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isOcc ? AppColors.warningSoft : AppColors.surfaceSubtle,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isOcc ? AppColors.warning : AppColors.border,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                t.number,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: isOcc ? AppColors.warning : AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                isOcc ? 'Terisi' : 'Kosong',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: isOcc ? AppColors.warning : AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
             const SizedBox(height: 16),
 
             // Recent POS Transactions Stream
@@ -227,7 +170,7 @@ class OwnerPosOverviewScreen extends StatelessWidget {
                             child: Icon(Icons.check_rounded, color: AppColors.primaryDark, size: 16),
                           ),
                           title: Text(o.orderNumber, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                          subtitle: Text('Meja ${o.tableNumber} • ${o.paymentMethod.label} • ${o.items.length} menu'),
+                          subtitle: Text('${o.tableLabel} • ${o.paymentMethod.label} • ${o.items.length} menu'),
                           trailing: Text(
                             AppCurrency.format(o.grandTotal),
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),

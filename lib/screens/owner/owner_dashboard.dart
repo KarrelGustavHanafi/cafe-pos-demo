@@ -70,6 +70,10 @@ class OwnerDashboard extends StatelessWidget {
     final currentShift = pos.currentShift;
     final recentOrders = pos.orders.take(5).toList();
 
+      // The hourly chart must reflect every paid sale made today, not just the
+      // five most recent orders shown in the activity list.
+      final todayPaidOrders = pos.getPaidOrdersForPeriod(ReportPeriod.today);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -138,7 +142,7 @@ class OwnerDashboard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Shift: ${currentShift.shiftName} • Kasir: ${currentShift.cashierName} • Meja Terisi: ${pos.occupiedTablesCount}',
+                          'Shift: ${currentShift.shiftName} • Kasir: ${currentShift.cashierName}',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
@@ -274,8 +278,6 @@ class OwnerDashboard extends StatelessWidget {
                       value: AppCurrency.format(todaySales),
                       icon: Icons.payments_rounded,
                       accentColor: AppColors.primary,
-                      trend: '+12.5%',
-                      isTrendPositive: true,
                       subtitle: 'Pendapatan kotor',
                       onTap: onViewSalesReport,
                     ),
@@ -284,8 +286,6 @@ class OwnerDashboard extends StatelessWidget {
                       value: '$txCount Transaksi',
                       icon: Icons.receipt_long_rounded,
                       accentColor: AppColors.accentCaramel,
-                      trend: '+8.3%',
-                      isTrendPositive: true,
                       subtitle: 'Pesanan lunas',
                       onTap: onViewOrders,
                     ),
@@ -294,8 +294,6 @@ class OwnerDashboard extends StatelessWidget {
                       value: AppCurrency.format(aov),
                       icon: Icons.trending_up_rounded,
                       accentColor: AppColors.primaryDark,
-                      trend: '+4.1%',
-                      isTrendPositive: true,
                       subtitle: 'Per transaksi',
                     ),
                     KpiCard(
@@ -303,8 +301,6 @@ class OwnerDashboard extends StatelessWidget {
                       value: '$itemsSold Pcs',
                       icon: Icons.coffee_rounded,
                       accentColor: AppColors.accentAmber,
-                      trend: '+15.0%',
-                      isTrendPositive: true,
                       subtitle: 'Volume porsi/cup',
                       onTap: onViewProducts,
                     ),
@@ -351,7 +347,7 @@ class OwnerDashboard extends StatelessWidget {
                                   style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                                 ),
                                 Text(
-                                  'Visualisasi transaksi berdasarkan jam operasional kafe',
+                                  'Transaksi lunas hari ini dikelompokkan berdasarkan jam',
                                   style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                 ),
                               ],
@@ -362,7 +358,7 @@ class OwnerDashboard extends StatelessWidget {
                       const SizedBox(height: 16),
                       SalesBarChart(
                         height: 120,
-                        data: _buildHourlyChartData(recentOrders),
+                        data: buildHourlyChartData(todayPaidOrders),
                       ),
                     ],
                   ),
@@ -556,7 +552,7 @@ class OwnerDashboard extends StatelessWidget {
                             ),
                           ),
                           title: Text(o.orderNumber, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13), overflow: TextOverflow.ellipsis),
-                          subtitle: Text('Meja ${o.tableNumber} • ${o.paymentMethod.label} • Kasir: ${o.cashierName}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text('${o.tableLabel} • ${o.paymentMethod.label} • Kasir: ${o.cashierName}', maxLines: 1, overflow: TextOverflow.ellipsis),
                           trailing: Text(
                             AppCurrency.format(o.grandTotal),
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textPrimary),
@@ -573,34 +569,31 @@ class OwnerDashboard extends StatelessWidget {
     );
   }
 
-  /// Builds curated hourly chart data combining real orders + realistic demo baseline.
-  List<SalesBarData> _buildHourlyChartData(List<Order> orders) {
-    final baseline = {
-      8: 45000, 9: 120000, 10: 185000, 11: 210000,
-      12: 320000, 13: 275000, 14: 195000, 15: 160000,
-      16: 140000, 17: 180000, 18: 250000, 19: 290000,
-      20: 215000, 21: 130000,
-    };
-
-    final actual = Map<int, int>.from(baseline);
+  /// Buckets paid sales by the hour they actually occurred in.
+  ///
+  /// Only real, paid orders contribute, using their own `createdAt` and
+  /// `grandTotal`. No baseline or estimated revenue is mixed in: hours without
+  /// a qualifying sale are simply absent, and an empty input yields an empty
+  /// chart so the widget can show its empty state. Exposed as a static helper so
+  /// the aggregation can be asserted directly in tests.
+  static List<SalesBarData> buildHourlyChartData(List<Order> orders) {
+    final byHour = <int, int>{};
     for (final o in orders) {
+      if (o.status != OrderStatus.paid) continue;
       final h = o.createdAt.hour;
-      actual[h] = (actual[h] ?? 0) + o.grandTotal;
+      byHour[h] = (byHour[h] ?? 0) + o.grandTotal;
     }
 
-    final now = DateTime.now().hour;
-    final result = <SalesBarData>[];
-    for (final entry in actual.entries) {
-      final h = entry.key;
-      if (h > now + 1) continue;
-      result.add(SalesBarData(
-        label: h.toString().padLeft(2, '0'),
-        value: entry.value,
-        isHighlighted: h == now || h == now - 1,
-      ));
-    }
-    result.sort((a, b) => int.parse(a.label).compareTo(int.parse(b.label)));
-    return result;
+    final hours = byHour.keys.toList()..sort();
+    final nowHour = DateTime.now().hour;
+    return [
+      for (final h in hours)
+        SalesBarData(
+          label: h.toString().padLeft(2, '0'),
+          value: byHour[h]!,
+          isHighlighted: h == nowHour,
+        ),
+    ];
   }
 
   Widget _buildPaymentTile(String title, String amount, IconData icon, Color color, double percentage) {

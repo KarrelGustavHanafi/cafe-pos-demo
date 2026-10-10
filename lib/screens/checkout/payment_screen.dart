@@ -47,7 +47,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   void initState() {
     super.initState();
-    final total = widget.pos.cartGrandTotal;
+    final total = _payableTotal;
     _cashTendered = total;
     _cashController.text = _cashTendered.toString();
   }
@@ -108,8 +108,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
     debugPrint('[QRIS] State: SHOW_QR');
   }
 
+  /// The single authoritative amount for this payment.
+  ///
+  /// Once checkout has been prepared, the order's totals are frozen and the
+  /// provider validates `paidAmount` against `order.grandTotal`. Reading the
+  /// live cart instead would let a business-config change move the displayed
+  /// total, the cash validity check and the QRIS amount away from the amount
+  /// actually charged.
+  ///
+  /// Falls back to the cart total before an order exists, so the screen stays
+  /// correct if it is ever shown outside the normal checkout flow.
+  int get _payableTotal =>
+      widget.pos.currentOrder?.grandTotal ?? widget.pos.cartGrandTotal;
+
   int get _changeAmount {
-    final total = widget.pos.cartGrandTotal;
+    final total = _payableTotal;
     if (_cashTendered >= total) {
       return _cashTendered - total;
     }
@@ -118,7 +131,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   bool get _isCashValid {
     if (_selectedMethod != PaymentMethod.cash) return true;
-    return _cashTendered >= widget.pos.cartGrandTotal;
+    return _cashTendered >= _payableTotal;
   }
 
   void _handlePay() async {
@@ -126,7 +139,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     await Future.delayed(const Duration(milliseconds: 350));
 
-    final total = widget.pos.cartGrandTotal;
+    final total = _payableTotal;
     final paidAmount = _selectedMethod == PaymentMethod.cash ? _cashTendered : total;
     final changeAmount = _selectedMethod == PaymentMethod.cash ? _changeAmount : 0;
 
@@ -201,7 +214,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     await service.createPayment(
       orderNumber: orderNum,
-      amount: widget.pos.cartGrandTotal,
+      amount: _payableTotal,
       method: PaymentMethod.qris,
     );
 
@@ -213,9 +226,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     final pos = widget.pos;
-    final total = pos.cartGrandTotal;
+    final total = _payableTotal;
     final orderNumber = pos.currentOrder?.orderNumber ?? pos.generateOrderNumber();
-    final tableName = pos.selectedTable?.number ?? 'Takeaway';
     final isMobile = Breakpoints.isMobile(context);
 
     return Scaffold(
@@ -290,7 +302,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             border: Border.all(color: AppColors.border),
                           ),
                           child: Text(
-                            'Meja $tableName • $orderNumber',
+                            orderNumber,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.right,
@@ -400,16 +412,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
             const Divider(height: 18, color: AppColors.border),
 
-            _buildCostLine('Subtotal', AppCurrency.format(pos.cartSubtotal)),
+            // Itemised breakdown must come from the same frozen order as the total,
+            // otherwise the lines would not add up to what is charged.
+            _buildCostLine(
+                'Subtotal',
+                AppCurrency.format(
+                    pos.currentOrder?.subtotal ?? pos.cartSubtotal)),
             const SizedBox(height: 4),
             _buildCostLine(
               'Biaya Layanan${pos.businessConfig.isServiceEnabled ? ' (${pos.businessConfig.serviceChargePercent.toStringAsFixed(0)}%)' : ''}',
-              AppCurrency.format(pos.cartServiceCharge),
+              AppCurrency.format(
+                  pos.currentOrder?.serviceCharge ?? pos.cartServiceCharge),
             ),
             const SizedBox(height: 4),
             _buildCostLine(
               'Pajak PB1${pos.businessConfig.isTaxEnabled ? ' (${pos.businessConfig.taxPercent.toStringAsFixed(0)}%)' : ''}',
-              AppCurrency.format(pos.cartTax),
+              AppCurrency.format(pos.currentOrder?.tax ?? pos.cartTax),
             ),
           ],
         ),

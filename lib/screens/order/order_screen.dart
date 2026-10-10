@@ -12,13 +12,11 @@ import '../../utils/shift_sale_guard.dart';
 class OrderScreen extends StatefulWidget {
   final PosProvider pos;
   final VoidCallback onCheckout;
-  final VoidCallback onChangeTable;
 
   const OrderScreen({
     super.key,
     required this.pos,
     required this.onCheckout,
-    required this.onChangeTable,
   });
 
   @override
@@ -91,7 +89,10 @@ class _OrderScreenState extends State<OrderScreen> {
     final isDesktop = Breakpoints.isDesktop(context);
     final isTablet = Breakpoints.isTablet(context);
 
-    final filteredProducts = widget.pos.products.where((product) {
+    // activeProducts hides deactivated items so a cashier cannot start a new
+      // sale for them. An item already in the cart is unaffected: checkout
+      // still validates stock, and no new active-status rejection is added.
+      final filteredProducts = widget.pos.activeProducts.where((product) {
       final matchesCategory =
           _selectedCategory == ProductCategory.all || product.category == _selectedCategory;
       final matchesSearch = product.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -127,8 +128,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 child: CartView(
                   pos: widget.pos,
                   onCheckout: widget.onCheckout,
-                  onChangeTable: widget.onChangeTable,
-                ),
+                          ),
               ),
             ),
           ],
@@ -157,8 +157,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 child: CartView(
                   pos: widget.pos,
                   onCheckout: widget.onCheckout,
-                  onChangeTable: widget.onChangeTable,
-                ),
+                          ),
               ),
             ),
           ],
@@ -486,10 +485,6 @@ class _OrderScreenState extends State<OrderScreen> {
             onCheckout: () {
               Navigator.pop(ctx);
               widget.onCheckout();
-            },
-            onChangeTable: () {
-              Navigator.pop(ctx);
-              widget.onChangeTable();
             },
           ),
         );

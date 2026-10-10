@@ -18,7 +18,6 @@ class CartView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = pos.cart;
-    final tableName = pos.selectedTable?.number ?? 'Takeaway';
 
     return Container(
       decoration: BoxDecoration(
@@ -69,7 +68,7 @@ class CartView extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              'Meja $tableName',
+                              'Bebas pilih meja',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -303,11 +302,16 @@ class CartView extends StatelessWidget {
                 _buildSummaryRow('Subtotal', AppCurrency.format(pos.cartSubtotal)),
                 const SizedBox(height: 3),
                 _buildSummaryRow(
-                  'Biaya Layanan (5%)',
+                  // Rates come from businessConfig, matching the payment
+                  // screen, so the label can never drift from the real charge.
+                  'Biaya Layanan${pos.businessConfig.isServiceEnabled ? ' (${pos.businessConfig.serviceChargePercent.toStringAsFixed(0)}%)' : ' (nonaktif)'}',
                   AppCurrency.format(pos.cartServiceCharge),
                 ),
                 const SizedBox(height: 3),
-                _buildSummaryRow('Pajak PB1 (10%)', AppCurrency.format(pos.cartTax)),
+                _buildSummaryRow(
+                  'Pajak PB1${pos.businessConfig.isTaxEnabled ? ' (${pos.businessConfig.taxPercent.toStringAsFixed(0)}%)' : ' (nonaktif)'}',
+                  AppCurrency.format(pos.cartTax),
+                ),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 5),
                   child: Divider(color: AppColors.border, height: 1),

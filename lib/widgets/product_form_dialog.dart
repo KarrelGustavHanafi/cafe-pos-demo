@@ -5,6 +5,52 @@ import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
 import 'shadcn_components.dart';
 
+/// Validates a price/stock/threshold field as a whole rupiah or unit number.
+///
+/// Previously these fields only checked for emptiness, so `int.tryParse(..) ?? 0`
+/// in [_ProductFormDialogState._submit] silently turned "abc", "" or a negative
+/// value into a stored 0 (business-rule defect D-7).
+///
+/// Rules:
+///  * blank is allowed only for optional fields ([allowBlank]); required fields
+///    report "wajib diisi",
+///  * non-numeric input is always rejected,
+///  * [minExclusive] fields must be strictly greater than 0,
+///  * values above [kMaxSafeInteger] are rejected: Dart web integers are doubles,
+///    so anything beyond 2^53 cannot be represented exactly.
+String? validateNumericField(
+  String? value, {
+  required String label,
+  bool allowBlank = false,
+  bool minExclusive = false,
+}) {
+  final text = (value ?? '').trim();
+
+  if (text.isEmpty) {
+    return allowBlank ? null : '$label wajib diisi';
+  }
+
+  final parsed = int.tryParse(text);
+  if (parsed == null) {
+    return '$label harus berupa angka';
+  }
+
+  if (parsed.abs() > kMaxSafeInteger) {
+    return '$label terlalu besar';
+  }
+
+  if (minExclusive) {
+    if (parsed <= 0) return '$label harus lebih besar dari 0';
+  } else if (parsed < 0) {
+    return '$label tidak boleh negatif';
+  }
+
+  return null;
+}
+
+/// Largest integer Dart Web can represent exactly (JS safe integer limit).
+const int kMaxSafeInteger = 9007199254740991; // 2^53 - 1
+
 class ProductFormDialog extends StatefulWidget {
   final Product? productToEdit;
   final VoidCallback? onDelete;
@@ -97,6 +143,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       iconName: _category == ProductCategory.coffee
           ? 'coffee'
           : (_category == ProductCategory.food ? 'rice' : 'matcha'),
+      // This dialog cannot edit modifier groups, so carry the existing ones
+      // across. Building a fresh Product would otherwise silently reset them,
+      // disabling cashier customization and modifier-based ingredient
+      // deductions. Mirrors Product.copyWith, which preserves them the same way.
+      modifierGroups: widget.productToEdit?.modifierGroups ?? const [],
     );
 
     widget.onSave(product);
@@ -371,7 +422,10 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                               child: TextFormField(
                                 controller: _priceController,
                                 keyboardType: TextInputType.number,
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Harga jual wajib diisi' : null,
+                                validator: (v) =>
+                                      validateNumericField(v,
+                                          label: 'Harga jual',
+                                          minExclusive: true),
                                 decoration: const InputDecoration(
                                   labelText: 'Harga Jual (Rp) *',
                                   prefixText: 'Rp ',
@@ -384,6 +438,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                               child: TextFormField(
                                 controller: _costPriceController,
                                 keyboardType: TextInputType.number,
+                                validator: (v) => validateNumericField(v, label: 'HPP', allowBlank: true),
                                 decoration: const InputDecoration(
                                   labelText: 'HPP (Rp)',
                                   prefixText: 'Rp ',
@@ -408,7 +463,10 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                         TextFormField(
                           controller: _priceController,
                           keyboardType: TextInputType.number,
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Harga jual wajib diisi' : null,
+                          validator: (v) =>
+                                      validateNumericField(v,
+                                          label: 'Harga jual',
+                                          minExclusive: true),
                           decoration: const InputDecoration(
                             labelText: 'Harga Jual (Rp) *',
                             prefixText: 'Rp ',
@@ -418,6 +476,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                         const SizedBox(height: 10),
                         TextFormField(
                           controller: _costPriceController,
+                                  validator: (v) =>
+                                      validateNumericField(v,
+                                          label: 'HPP', allowBlank: true),
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
                             labelText: 'HPP (Rp)',
@@ -448,7 +509,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                               child: TextFormField(
                                 controller: _stockController,
                                 keyboardType: TextInputType.number,
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Stok wajib diisi' : null,
+                                validator: (v) =>
+                                      validateNumericField(v, label: 'Stok'),
                                 decoration: const InputDecoration(
                                   labelText: 'Stok *',
                                   suffixText: 'unit',
@@ -460,6 +522,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                             Expanded(
                               child: TextFormField(
                                 controller: _thresholdController,
+                                  validator: (v) =>
+                                      validateNumericField(v,
+                                          label: 'Batas rendah stok', allowBlank: true),
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
                                   labelText: 'Batas Rendah',
@@ -504,7 +569,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                         TextFormField(
                           controller: _stockController,
                           keyboardType: TextInputType.number,
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Stok wajib diisi' : null,
+                          validator: (v) =>
+                                      validateNumericField(v, label: 'Stok'),
                           decoration: const InputDecoration(
                             labelText: 'Stok *',
                             suffixText: 'unit',
@@ -514,6 +580,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                         const SizedBox(height: 10),
                         TextFormField(
                           controller: _thresholdController,
+                          validator: (v) =>
+                              validateNumericField(v, label: 'Batas rendah stok', allowBlank: true),
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
                             labelText: 'Batas Rendah',
@@ -620,7 +688,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                                               widget.currentRecipe!.items.isNotEmpty
                                           ? widget.currentRecipe!.items
                                               .map((i) =>
-                                                  '${i.materialName} (${i.quantity.toStringAsFixed(i.quantity.truncateToDouble() == i.quantity ? 0 : 1)} ${i.unit})')
+                                                  // `unit` is a RawMaterialUnit enum; interpolate its display label so the
+                                              // owner sees "18 gram", not "RawMaterialUnit.gram".
+                                              '${i.materialName} (${i.quantity.toStringAsFixed(i.quantity.truncateToDouble() == i.quantity ? 0 : 1)} ${i.unit.label})')
                                               .join(', ')
                                           : 'Atur resep agar bahan baku otomatis terpotong dari stok.',
                                       maxLines: 2,

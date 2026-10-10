@@ -19,13 +19,9 @@ class PosApp extends StatefulWidget {
 }
 
 class _PosAppState extends State<PosApp> {
+  // PosProvider's constructor kicks off the persisted-config load, so it must not
+  // be triggered again here or the config would be read twice.
   final PosProvider _posProvider = PosProvider();
-
-  @override
-  void initState() {
-    super.initState();
-    _posProvider.loadPersistedConfig();
-  }
 
   @override
   Widget build(BuildContext context) {

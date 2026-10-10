@@ -188,7 +188,7 @@ class SalesReportScreen extends StatelessWidget {
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            'Meja ${order.tableNumber}',
+                                            order.tableLabel,
                                             style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
                                           ),
                                         ),

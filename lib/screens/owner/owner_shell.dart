@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/demo_data_notice.dart';
 import 'owner_dashboard.dart';
 import 'owner_pos_overview_screen.dart';
 import 'owner_orders_screen.dart';
@@ -9,7 +10,6 @@ import 'owner_sales_screen.dart';
 import 'owner_products_screen.dart';
 import 'owner_categories_screen.dart';
 import 'owner_inventory_screen.dart';
-import 'owner_tables_screen.dart';
 import 'owner_reports_screen.dart';
 import 'owner_shifts_screen.dart';
 import 'owner_settings_screen.dart';
@@ -94,8 +94,6 @@ class _OwnerShellState extends State<OwnerShell> {
         return 'Kategori Menu';
       case 6:
         return 'Inventaris & Stok';
-      case 7:
-        return 'Manajemen Meja';
       case 8:
         return 'Laporan Bisnis';
       case 9:
@@ -258,7 +256,6 @@ class _OwnerShellState extends State<OwnerShell> {
                 const SizedBox(height: 6),
                 _buildSectionHeader('OPERASIONAL'),
                 _buildNavItem(2, Icons.receipt_long_rounded, 'Pesanan (Orders)', badge: '${widget.pos.todayTransactionsCount}'),
-                _buildNavItem(7, Icons.table_restaurant_rounded, 'Denah & Meja'),
                 _buildNavItem(9, Icons.lock_clock_rounded, 'Monitoring Shift'),
 
                 const SizedBox(height: 6),
@@ -474,7 +471,6 @@ class _OwnerShellState extends State<OwnerShell> {
                   const SizedBox(height: 6),
                   _buildSectionHeader('OPERASIONAL'),
                   _buildNavItem(2, Icons.receipt_long_rounded, 'Pesanan (Orders)'),
-                  _buildNavItem(7, Icons.table_restaurant_rounded, 'Manajemen Meja'),
                   _buildNavItem(9, Icons.lock_clock_rounded, 'Monitoring Shift'),
 
                   const SizedBox(height: 6),
@@ -591,7 +587,6 @@ class _OwnerShellState extends State<OwnerShell> {
           onViewOrders: () => setState(() => _currentTab = 2),
           onViewInventory: () => setState(() => _currentTab = 6),
           onViewShifts: () => setState(() => _currentTab = 9),
-          onViewTables: () => setState(() => _currentTab = 7),
         );
       case 1:
         content = OwnerPosOverviewScreen(pos: widget.pos);
@@ -606,7 +601,6 @@ class _OwnerShellState extends State<OwnerShell> {
       case 6:
         content = OwnerInventoryScreen(pos: widget.pos);
       case 7:
-        content = OwnerTablesScreen(pos: widget.pos);
       case 8:
         content = OwnerReportsScreen(pos: widget.pos);
       case 9:
@@ -617,16 +611,25 @@ class _OwnerShellState extends State<OwnerShell> {
         content = const SizedBox();
     }
 
-    return AnimatedSwitcher(
-      duration: AppAnimations.normal,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
-      child: KeyedSubtree(
-        key: ValueKey<int>(_currentTab),
-        child: content,
-      ),
+    // Demo data disclosure sits above every owner tab so the limitation is
+    // visible during the main workflow without blocking it.
+    return Column(
+      children: [
+        const DemoDataNotice(),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: AppAnimations.normal,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: child,
+            ),
+            child: KeyedSubtree(
+              key: ValueKey<int>(_currentTab),
+              child: content,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

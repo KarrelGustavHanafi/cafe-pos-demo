@@ -83,12 +83,16 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
 
+    // Reuse the canonical "today" window so this screen and the reporting
+    // screens can never disagree about which calendar date "today" means.
+    final today = PosProvider.periodWindow(ReportPeriod.today, now).start;
+
     final filteredOrders = widget.pos.orders.where((o) {
       if (_filterTodayOnly) {
-        final isToday = o.createdAt.year == now.year &&
-            o.createdAt.month == now.month &&
-            o.createdAt.day == now.day;
-        if (!isToday) return false;
+        // Calendar-date comparison, matching PosProvider's period filtering.
+        final orderDate =
+            DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
+        if (!orderDate.isAtSameMomentAs(today)) return false;
       }
       if (_methodFilter != null && o.paymentMethod != _methodFilter) return false;
       if (_statusFilter != null && o.status != _statusFilter) return false;
@@ -130,7 +134,7 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
                               controller: _searchController,
                               onChanged: (v) => setState(() => _search = v),
                               decoration: const InputDecoration(
-                                hintText: 'Cari No. Order, Meja, atau Kasir...',
+                                hintText: 'Cari No. Order, Lokasi, atau Kasir...',
                                 prefixIcon: Icon(Icons.search_rounded, size: 18),
                                 contentPadding: EdgeInsets.symmetric(horizontal: 10),
                               ),
@@ -275,7 +279,7 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        'Meja ${order.tableNumber} • Kasir: ${order.cashierName} • $itemsCount item',
+                                        '${order.tableLabel} • Kasir: ${order.cashierName} • $itemsCount item',
                                         style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                       ),
                                     ],

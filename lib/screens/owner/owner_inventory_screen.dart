@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/mock_data.dart';
 import '../../models/product.dart';
 import '../../models/raw_material.dart';
 import '../../models/stock_adjustment.dart';
@@ -1361,7 +1362,9 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    '${_formatNum(ing.quantity)} ${ing.unit}',
+                                    // Use the enum's display label, not its Dart name: interpolating the enum
+                                    // itself rendered "RawMaterialUnit.gram" to the owner.
+                                    '${_formatNum(ing.quantity)} ${ing.unit.label}',
                                     style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.primaryDark),
                                   ),
                                 ],
@@ -1537,8 +1540,30 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> with Single
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  // Seeded demo rows are labelled so they cannot be mistaken for a real
+                                  // operational adjustment.
+                                  if (adj.reason
+                                      .contains(MockData.samplePrefix))
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.warningSoft,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                            color: AppColors.warning),
+                                      ),
+                                      child: const Text(
+                                        'Data Contoh',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.warning,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${adj.reason} • Oleh: ${adj.adjustedBy}',

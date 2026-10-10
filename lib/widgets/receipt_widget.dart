@@ -91,7 +91,11 @@ class ReceiptWidget extends StatelessWidget {
           const SizedBox(height: 3),
           _buildMetaRow('Kasir', order.cashierName),
           const SizedBox(height: 3),
-          _buildMetaRow('Meja', 'Meja ${order.tableNumber}'),
+          // Seating is free-choice: a takeaway order was never assigned a table, so
+// printing "Meja Takeaway" would be meaningless to the customer. Mirrors the
+// guard already used by receipt_formatter.dart.
+            if (order.tableNumber.toLowerCase() != 'takeaway')
+              _buildMetaRow('Meja', 'Meja ${order.tableNumber}'),
           const SizedBox(height: 3),
           _buildMetaRow('Status', order.status.label),
 

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/product.dart';
-import '../models/table.dart';
 import '../models/cart_item.dart';
 import '../models/order.dart';
 import '../models/shift.dart';
@@ -32,7 +31,6 @@ import '../utils/shift_sale_guard.dart';
 class PosProvider extends ChangeNotifier {
   User? _currentUser;
   late List<Product> _products;
-  late List<CafeTable> _tables;
   late List<Order> _orders;
   late ShiftInfo _currentShift;
   late List<ShiftInfo> _pastShifts;
@@ -49,16 +47,34 @@ class PosProvider extends ChangeNotifier {
   late Map<String, ProductRecipe> _recipes;
 
   // Active Order Flow State
-  CafeTable? _selectedTable;
   final List<CartItem> _cart = [];
   Order? _currentOrder; // Active pending/just-paid order
 
-  PosProvider({AppStorage? storage, BusinessConfigService? configService}) {
-    _initData(storage: storage, configService: configService);
+  /// Builds the provider state, optionally from injected [initialOrders].
+///
+/// [initialOrders] exists for period-filter tests that need orders on
+/// specific dates. When it is omitted the provider seeds itself from
+/// [MockData] exactly as before. When supplied it *replaces* the mock orders
+/// outright rather than being appended to them, so seeded totals stay
+/// predictable.
+  PosProvider({
+    AppStorage? storage,
+    BusinessConfigService? configService,
+    List<Order>? initialOrders,
+  }) {
+    _initData(
+      storage: storage,
+      configService: configService,
+      initialOrders: initialOrders,
+    );
     loadPersistedConfig();
   }
 
-  void _initData({AppStorage? storage, BusinessConfigService? configService}) {
+  void _initData({
+    AppStorage? storage,
+    BusinessConfigService? configService,
+    List<Order>? initialOrders,
+  }) {
     _storage = storage ?? LocalAppStorage();
     _configService = configService ?? LocalBusinessConfigService(_storage);
     _businessConfig = _configService.config;
@@ -71,10 +87,13 @@ class PosProvider extends ChangeNotifier {
     _telegramNotificationService = TelegramNotificationService(_telegramService);
 
     _products = MockData.getInitialProducts();
-    _tables = MockData.getInitialTables();
     _currentShift = MockData.getInitialShift();
     _pastShifts = MockData.getPastShifts();
-    _orders = MockData.getInitialOrders(_products);
+    // Replace the mock orders when a caller injects its own, so the two sets
+    // are never combined and period totals remain predictable in tests.
+    _orders = initialOrders != null
+        ? List<Order>.from(initialOrders)
+        : MockData.getInitialOrders(_products);
     _categories = [
       ProductCategory.coffee,
       ProductCategory.nonCoffee,
@@ -101,7 +120,6 @@ class PosProvider extends ChangeNotifier {
   bool get isAuthenticated => _currentUser != null;
   List<Product> get products => List.unmodifiable(_products);
   List<Product> get activeProducts => _products.where((p) => p.isActive).toList();
-  List<CafeTable> get tables => List.unmodifiable(_tables);
   List<Order> get orders => List.unmodifiable(_orders);
   ShiftInfo get currentShift => _currentShift;
   List<ShiftInfo> get pastShifts => List.unmodifiable(_pastShifts);
@@ -115,7 +133,6 @@ class PosProvider extends ChangeNotifier {
   PrinterService get printerService => _receiptService.printerService;
   TelegramService get telegramService => _telegramService;
   TelegramNotificationService get telegramNotificationService => _telegramNotificationService;
-  CafeTable? get selectedTable => _selectedTable;
   List<CartItem> get cart => List.unmodifiable(_cart);
   Order? get currentOrder => _currentOrder;
 
@@ -165,23 +182,11 @@ class PosProvider extends ChangeNotifier {
   void logout() {
     _currentUser = null;
     clearCart();
-    _selectedTable = null;
     notifyListeners();
   }
 
   void switchUserRole(UserRole role) {
     _currentUser = MockData.users.firstWhere((u) => u.role == role);
-    notifyListeners();
-  }
-
-  // Table Selection (Cashier)
-  void selectTable(CafeTable table) {
-    _selectedTable = table;
-    notifyListeners();
-  }
-
-  void clearSelectedTable() {
-    _selectedTable = null;
     notifyListeners();
   }
 
@@ -372,11 +377,11 @@ class PosProvider extends ChangeNotifier {
   Order prepareCheckoutOrder({PaymentMethod paymentMethod = PaymentMethod.cash}) {
     ensureShiftOpenForSale();
 
-    final tableNum = _selectedTable?.number ?? 'Takeaway';
     final cashier = _currentUser?.displayName ?? 'Siti Rahma (Kasir)';
     final order = Order.create(
       orderNumber: generateOrderNumber(),
-      tableNumber: tableNum,
+      // Seating is free-choice: no table is ever assigned by the cashier.
+      tableNumber: 'Takeaway',
       items: List.from(_cart),
       cashierName: cashier,
       paymentMethod: paymentMethod,
@@ -556,7 +561,11 @@ class PosProvider extends ChangeNotifier {
           name: item.product.name,
           unit: 'pcs',
           isRawMaterial: false,
-          minimumStock: _businessConfig.defaultLowStockThreshold.toDouble(),
+          // The alert must use the product's own threshold, matching what
+          // `Product.isLowStock` and the inventory screen show. Using the
+          // business-wide default here made the two disagree for every product
+          // whose threshold was configured individually.
+          minimumStock: _products[productIndex].lowStockThreshold.toDouble(),
           reason: 'Penjualan #${order.orderNumber} (${item.quantity}x ${item.product.name}'
               '${item.hasModifiers ? ' [${item.modifierSummary}]' : ''})',
         ),
@@ -677,14 +686,6 @@ class PosProvider extends ChangeNotifier {
     _orders.insert(0, finishedOrder);
     _currentOrder = finishedOrder;
 
-    if (_selectedTable != null) {
-      final tableIndex = _tables.indexWhere((t) => t.id == _selectedTable!.id);
-      if (tableIndex >= 0) {
-        _tables[tableIndex].status = TableStatus.occupied;
-        _tables[tableIndex].currentOrderId = finishedOrder.orderNumber;
-      }
-    }
-
     _cart.clear();
 
     plan.newlyLowStock.addAll(newlyLowStock);
@@ -735,17 +736,6 @@ class PosProvider extends ChangeNotifier {
       adjustmentsLength: _stockAdjustments.length,
       currentOrder: _currentOrder,
       cart: List<CartItem>.from(_cart),
-      tableId: _selectedTable?.id,
-      tableStatus: _selectedTable == null
-          ? null
-          : _tables.indexWhere((t) => t.id == _selectedTable!.id) >= 0
-              ? _tables[_tables.indexWhere((t) => t.id == _selectedTable!.id)].status
-              : null,
-      tableOrderId: _selectedTable == null
-          ? null
-          : _tables.indexWhere((t) => t.id == _selectedTable!.id) >= 0
-              ? _tables[_tables.indexWhere((t) => t.id == _selectedTable!.id)].currentOrderId
-              : null,
     );
   }
 
@@ -767,28 +757,11 @@ class PosProvider extends ChangeNotifier {
     _cart
       ..clear()
       ..addAll(snapshot.cart);
-    final tableId = snapshot.tableId;
-    if (tableId != null && snapshot.tableStatus != null) {
-      final tableIndex = _tables.indexWhere((t) => t.id == tableId);
-      if (tableIndex >= 0) {
-        _tables[tableIndex].status = snapshot.tableStatus!;
-        _tables[tableIndex].currentOrderId = snapshot.tableOrderId;
-      }
-    }
   }
 
   String _formatQty(double value) => value == value.roundToDouble()
       ? value.toInt().toString()
       : value.toStringAsFixed(1);
-
-  void freeTable(String tableNumber) {
-    final index = _tables.indexWhere((t) => t.number == tableNumber);
-    if (index >= 0) {
-      _tables[index].status = TableStatus.available;
-      _tables[index].currentOrderId = null;
-      notifyListeners();
-    }
-  }
 
   // ==========================================
   // OWNER: PRODUCT MANAGEMENT
@@ -1141,27 +1114,7 @@ class PosProvider extends ChangeNotifier {
 
 
   // ==========================================
-  // OWNER: TABLE MANAGEMENT
-  // ==========================================
-  void addTable(CafeTable table) {
-    _tables.add(table);
-    notifyListeners();
-  }
-
-  void updateTable(CafeTable updatedTable) {
-    final index = _tables.indexWhere((t) => t.id == updatedTable.id);
-    if (index >= 0) {
-      _tables[index] = updatedTable;
-      notifyListeners();
-    }
-  }
-
-  void deleteTable(String id) {
-    _tables.removeWhere((t) => t.id == id);
-    notifyListeners();
-  }
-
-
+  // OWNER: SETTINGS MANAGEMENT
   // ==========================================
   // OWNER: SETTINGS & BUSINESS CONFIG MANAGEMENT
   // ==========================================
@@ -1467,8 +1420,6 @@ class PosProvider extends ChangeNotifier {
       .where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.debitCard)
       .fold<int>(0, (sum, o) => sum + o.grandTotal);
 
-  int get availableTablesCount => _tables.where((t) => t.isAvailable).length;
-  int get occupiedTablesCount => _tables.where((t) => t.isOccupied).length;
 
   Map<String, int> get productSalesCounts {
     final map = <String, int>{};
@@ -1501,6 +1452,36 @@ class PosProvider extends ChangeNotifier {
 
   // PERIOD-BASED FILTERING
   // ==========================================
+
+  /// The single canonical definition of every [ReportPeriod] window.
+  ///
+  /// Windows are inclusive rolling calendar-date ranges that end on, and
+  /// include, [reference]'s own calendar date:
+  ///
+  ///  * [ReportPeriod.today]      -> 1 calendar date
+  ///  * [ReportPeriod.last7Days]  -> 7 calendar dates (reference minus 6)
+  ///  * [ReportPeriod.last30Days] -> 30 calendar dates (reference minus 29)
+  ///
+  /// Both endpoints are inclusive. Only the calendar date matters, so a sale at
+  /// 23:59 still belongs to that day. Times are local: [reference] is expected
+  /// to already be a local time, and no UTC conversion is applied anywhere.
+  ///
+  /// Taking [reference] as a parameter (rather than reading the clock here)
+  /// keeps the window logic deterministic and unit-testable.
+  static ({DateTime start, DateTime end}) periodWindow(
+    ReportPeriod period,
+    DateTime reference,
+  ) {
+    final today = DateTime(reference.year, reference.month, reference.day);
+    final backDays = switch (period) {
+      ReportPeriod.today => 0,
+      ReportPeriod.last7Days => 6,
+      ReportPeriod.last30Days => 29,
+    };
+    final start = today.subtract(Duration(days: backDays));
+    return (start: start, end: today);
+  }
+
   List<Order> _getOrdersInPeriod(DateTime start, DateTime end) {
     return _orders.where((o) {
       final orderDate = DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
@@ -1513,18 +1494,8 @@ class PosProvider extends ChangeNotifier {
   }
 
   List<Order> getOrdersForPeriod(ReportPeriod period) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    switch (period) {
-      case ReportPeriod.today:
-        return _getOrdersInPeriod(today, today);
-      case ReportPeriod.last7Days:
-        final sevenDaysAgo = today.subtract(const Duration(days: 7));
-        return _getOrdersInPeriod(sevenDaysAgo, today);
-      case ReportPeriod.last30Days:
-        final thirtyDaysAgo = today.subtract(const Duration(days: 30));
-        return _getOrdersInPeriod(thirtyDaysAgo, today);
-    }
+    final window = periodWindow(period, DateTime.now());
+    return _getOrdersInPeriod(window.start, window.end);
   }
 
   int getSalesTotalForPeriod(ReportPeriod period) {
@@ -1659,9 +1630,6 @@ class _SaleSnapshot {
   final int adjustmentsLength;
   final Order? currentOrder;
   final List<CartItem> cart;
-  final String? tableId;
-  final TableStatus? tableStatus;
-  final String? tableOrderId;
 
   const _SaleSnapshot({
     required this.productStocks,
@@ -1670,8 +1638,5 @@ class _SaleSnapshot {
     required this.adjustmentsLength,
     required this.currentOrder,
     required this.cart,
-    required this.tableId,
-    required this.tableStatus,
-    required this.tableOrderId,
   });
 }

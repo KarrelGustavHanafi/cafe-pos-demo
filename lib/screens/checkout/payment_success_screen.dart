@@ -98,7 +98,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                         children: [
                           _buildDetailRow('Nomor Pesanan', order.orderNumber, isBold: true),
                           const SizedBox(height: 6),
-                          _buildDetailRow('Meja / Lokasi', 'Meja ${order.tableNumber}'),
+                          _buildDetailRow('Lokasi', order.tableNumber.toLowerCase() == 'takeaway' ? 'Ambil di kasir' : 'Meja ${order.tableNumber}'),
                           const SizedBox(height: 6),
                           _buildDetailRow('Metode Pembayaran', order.paymentMethod.label),
                           const SizedBox(height: 6),
