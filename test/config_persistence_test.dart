@@ -229,29 +229,45 @@ void main() {
       expect(t.botToken, isNull);
     });
 
-    test('7b. Telegram botToken persists in directBotApi (sandbox) mode', () async {
-      final storage = LocalAppStorage();
-      final pos = PosProvider(storage: storage);
-      await pos.loadPersistedConfig();
+      test('7b. Telegram botToken is NOT persisted in any mode, incl. directBotApi',
+          () async {
+        // SECURITY (Phase 1 hardening): this test previously asserted that the
+        // bot token survived a save/load round-trip. That WAS the vulnerability -
+        // a Telegram bot token in browser storage is readable by any script on
+        // the origin. The token now lives only in the relay Worker's
+        // TELEGRAM_BOT_TOKEN secret and never in localStorage.
+        final storage = LocalAppStorage();
+        final pos = PosProvider(storage: storage);
+        await pos.loadPersistedConfig();
 
-      final sandboxTelegram = const TelegramConfig(
-        enabled: true,
-        botUsername: '@SandboxBot',
-        chatId: '-100111222333',
-        integrationMode: TelegramIntegrationMode.directBotApi,
-        testMode: true,
-        botToken: 'sandbox_test_token',
-      );
+        final sandboxTelegram = const TelegramConfig(
+          enabled: true,
+          botUsername: '@SandboxBot',
+          chatId: '-100111222333',
+          integrationMode: TelegramIntegrationMode.directBotApi,
+          testMode: true,
+          botToken: 'sandbox_test_token',
+        );
 
-      await pos.updateBusinessConfig(pos.businessConfig.copyWith(telegramConfig: sandboxTelegram));
+        await pos.updateBusinessConfig(
+            pos.businessConfig.copyWith(telegramConfig: sandboxTelegram));
 
-      final reloadedPos = PosProvider(storage: storage);
-      await reloadedPos.loadPersistedConfig();
+        // The raw stored payload must not contain the token at all.
+        final raw = await storage.getString('caffe_business_config');
+        expect(raw, isNotNull);
+        expect(raw, isNot(contains('sandbox_test_token')),
+            reason: 'bot token must never be written to browser storage');
 
-      final t = reloadedPos.businessConfig.telegramConfig;
-      expect(t.integrationMode, TelegramIntegrationMode.directBotApi);
-      expect(t.botToken, 'sandbox_test_token');
-    });
+        // And it must not be rehydrated into the client on load.
+        final reloadedPos = PosProvider(storage: storage);
+        await reloadedPos.loadPersistedConfig();
+
+        final t = reloadedPos.businessConfig.telegramConfig;
+        expect(t.integrationMode, TelegramIntegrationMode.directBotApi,
+            reason: 'the selected mode itself still persists');
+        expect(t.botToken, isNull,
+            reason: 'a persisted bot token must be discarded, not rehydrated');
+      });
 
     test('8. QRIS config persists across save and load', () async {
       final storage = LocalAppStorage();

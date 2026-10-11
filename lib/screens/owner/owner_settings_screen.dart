@@ -41,6 +41,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
   late TextEditingController _telegramChatIdController;
   late TextEditingController _telegramEndpointController;
   late TextEditingController _telegramBotTokenController;
+  late TextEditingController _telegramRelaySecretController;
   late TelegramIntegrationMode _telegramIntegrationMode;
 
   // QRIS Integration State
@@ -84,6 +85,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
     _telegramChatIdController = TextEditingController(text: t.chatId);
     _telegramEndpointController = TextEditingController(text: t.endpoint);
     _telegramBotTokenController = TextEditingController(text: t.botToken ?? '');
+    _telegramRelaySecretController = TextEditingController(text: t.relaySecret ?? '');
     // Use safe mode: in public demo, Direct Bot API is replaced with Mock Simulation
     _telegramIntegrationMode = t.getSafeMode(b.isPublicDemo);
 
@@ -110,6 +112,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
     _telegramChatIdController.dispose();
     _telegramEndpointController.dispose();
     _telegramBotTokenController.dispose();
+    _telegramRelaySecretController.dispose();
     _qrisMerchantNameController.dispose();
     _qrisMerchantIdController.dispose();
     super.dispose();
@@ -123,6 +126,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
       endpoint: _telegramEndpointController.text.trim(),
       integrationMode: _telegramIntegrationMode,
       botToken: _telegramBotTokenController.text.trim().isEmpty ? null : _telegramBotTokenController.text.trim(),
+      relaySecret: _telegramRelaySecretController.text.trim().isEmpty
+          ? null
+          : _telegramRelaySecretController.text.trim(),
+      // An emptied field must REMOVE the stored secret, not keep the old one.
+      clearRelaySecret: _telegramRelaySecretController.text.trim().isEmpty,
     );
 
     final updatedQris = widget.pos.businessConfig.qrisConfig.copyWith(
@@ -178,6 +186,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
       endpoint: _telegramEndpointController.text.trim(),
       integrationMode: _telegramIntegrationMode,
       botToken: _telegramBotTokenController.text.trim().isEmpty ? null : _telegramBotTokenController.text.trim(),
+      relaySecret: _telegramRelaySecretController.text.trim().isEmpty
+          ? null
+          : _telegramRelaySecretController.text.trim(),
     );
     final tempService = TelegramBotService(
       config: tempConfig,
@@ -203,6 +214,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
       endpoint: _telegramEndpointController.text.trim(),
       integrationMode: _telegramIntegrationMode,
       botToken: _telegramBotTokenController.text.trim().isEmpty ? null : _telegramBotTokenController.text.trim(),
+      relaySecret: _telegramRelaySecretController.text.trim().isEmpty
+          ? null
+          : _telegramRelaySecretController.text.trim(),
     );
     final tempService = TelegramBotService(
       config: tempConfig,
@@ -684,8 +698,20 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
                       controller: _telegramEndpointController,
                       decoration: const InputDecoration(
                         labelText: 'Endpoint Relay Webhook URL',
-                        hintText: 'https://relay.yourdomain.com/sendTelegram',
+                        hintText: 'https://telegram-relay.yourdomain.com',
                         prefixIcon: Icon(Icons.link_rounded, size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _telegramRelaySecretController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Relay Secret (sama dengan TELEGRAM_RELAY_SECRET di Worker)',
+                        helperText: 'Disimpan di browser agar tidak perlu mengetik ulang. '
+                            'Bot token TIDAK pernah disimpan di sini.',
+                        helperMaxLines: 3,
+                        prefixIcon: Icon(Icons.vpn_key_rounded, size: 18),
                       ),
                     ),
                   ],

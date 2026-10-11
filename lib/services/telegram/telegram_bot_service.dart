@@ -5,6 +5,28 @@ import '../../models/business_config.dart';
 import 'telegram_service.dart';
 import 'telegram_formatter.dart';
 
+/// Strips any known secret out of a message before it is returned or logged.
+///
+/// Upstream failures (and Dart exceptions) can echo the request URL, which for
+/// Direct Bot API embeds the bot token, and for the relay embeds nothing but
+/// can still surface the relay secret. Both are replaced with a marker so no
+/// credential can reach the UI, the console, or a crash report.
+String _redactSecrets(String message, List<String> secrets) {
+  var result = message;
+  for (final secret in secrets) {
+    final value = secret.trim();
+    if (value.isEmpty) continue;
+    result = result.replaceAll(value, '[REDACTED]');
+  }
+  // Defence in depth: also mask anything that *looks* like a bot token, even if
+  // it was not one of the supplied values.
+  result = result.replaceAll(
+    RegExp(r'\d{6,12}:[A-Za-z0-9_-]{30,}'),
+    '[REDACTED]',
+  );
+  return result;
+}
+
 class TelegramBotService implements TelegramService {
   @override
   final TelegramConfig config;
@@ -58,12 +80,23 @@ class TelegramBotService implements TelegramService {
       );
     }
 
-    // 2. Direct Bot API (Sandbox / test mode with user-provided token from settings)
+    // 2. Direct Bot API — NON-DURABLE SANDBOX ONLY.
+    //
+    // SECURITY: this path talks to Telegram straight from the browser, so the
+    // bot token exists in client memory and in the request URL. It is therefore
+    // NOT a production path:
+    //   * `botToken` is never persisted (see TelegramConfig.toJson), so the mode
+    //     stops working after a refresh and cannot be configured durably;
+    //   * the token is never rendered into any message or exception;
+    //   * public demo mode blocks it entirely (see the guard above).
+    // Real deployments must use the relay Worker, where the token is a
+    // Cloudflare secret that never reaches the browser.
     if (config.integrationMode == TelegramIntegrationMode.directBotApi) {
       final token = config.botToken?.trim() ?? '';
       if (token.isEmpty) {
         return TelegramSendResult.failure(
-          message: 'Bot token belum diisi untuk pengujian Direct Bot API. Gunakan mode Mock atau isi token uji coba.',
+          message: 'Direct Bot API memerlukan bot token untuk sesi ini saja. '
+              'Untuk penggunaan nyata, gunakan mode Relay Webhook.',
           statusCode: 401,
         );
       }
@@ -91,16 +124,23 @@ class TelegramBotService implements TelegramService {
             rawResponse: data,
           );
         } else {
-          final description = data['description'] ?? 'Gagal mengirim pesan ke Telegram';
+          // Never echo upstream text verbatim: it may embed the request URL,
+          // which contains the bot token.
           return TelegramSendResult.failure(
-            message: 'Telegram API Error (${response.statusCode}): $description',
+            message: _redactSecrets(
+              'Telegram API Error (${response.statusCode}): '
+              '${data['description'] ?? 'Gagal mengirim pesan ke Telegram'}',
+              [token],
+            ),
             statusCode: response.statusCode,
-            rawResponse: data,
           );
         }
       } catch (e) {
         return TelegramSendResult.failure(
-          message: 'Koneksi ke Telegram terputus atau timeout: $e',
+          message: _redactSecrets(
+            'Koneksi ke Telegram terputus atau timeout: $e',
+            [token],
+          ),
           statusCode: 504,
         );
       }
@@ -116,6 +156,15 @@ class TelegramBotService implements TelegramService {
         );
       }
 
+      final relaySecret = config.relaySecret?.trim() ?? '';
+      if (relaySecret.isEmpty) {
+        return TelegramSendResult.failure(
+          message: 'Relay Webhook membutuhkan Relay Secret. '
+              'Isi di Pengaturan > Integrasi Telegram (sama dengan secret Worker).',
+          statusCode: 401,
+        );
+      }
+
       try {
         // Always use /telegram/send — the worker handles the bot token
         final sendUrl = endpoint.endsWith('/') ? '${endpoint}telegram/send' : '$endpoint/telegram/send';
@@ -123,7 +172,11 @@ class TelegramBotService implements TelegramService {
         final response = await _httpClient
             .post(
               uri,
-              headers: {'Content-Type': 'application/json'},
+              headers: {
+                'Content-Type': 'application/json',
+                // Server-to-server authentication for the relay.
+                'X-Relay-Secret': relaySecret,
+              },
               body: jsonEncode({
                 'chatId': config.chatId.trim(),
                 'message': text,
@@ -142,14 +195,20 @@ class TelegramBotService implements TelegramService {
         } else {
           final errMsg = data['error']?.toString() ?? 'Relay error';
           return TelegramSendResult.failure(
-            message: 'Relay Webhook (${response.statusCode}): $errMsg',
+            message: _redactSecrets(
+              'Relay Webhook (${response.statusCode}): $errMsg',
+              [relaySecret],
+            ),
             statusCode: response.statusCode,
             rawResponse: data,
           );
         }
       } catch (e) {
         return TelegramSendResult.failure(
-          message: 'Gagal menghubungi Secure Relay Webhook: $e',
+          message: _redactSecrets(
+            'Gagal menghubungi Secure Relay Webhook: $e',
+            [relaySecret],
+          ),
           statusCode: 502,
         );
       }
@@ -216,13 +275,25 @@ class TelegramBotService implements TelegramService {
         );
       }
 
+      final relaySecret = config.relaySecret?.trim() ?? '';
+      if (relaySecret.isEmpty) {
+        return TelegramSendResult.failure(
+          message: 'Relay Webhook membutuhkan Relay Secret. '
+              'Isi di Pengaturan > Integrasi Telegram (sama dengan secret Worker).',
+          statusCode: 401,
+        );
+      }
+
       try {
         final testUrl = endpoint.endsWith('/') ? '${endpoint}telegram/test' : '$endpoint/telegram/test';
         final uri = Uri.parse(testUrl);
         final response = await _httpClient
             .post(
               uri,
-              headers: {'Content-Type': 'application/json'},
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Relay-Secret': relaySecret,
+              },
               body: jsonEncode({
                 'chatId': config.chatId.trim(),
               }),
@@ -239,14 +310,20 @@ class TelegramBotService implements TelegramService {
         } else {
           final errMsg = data['error']?.toString() ?? 'Relay test error';
           return TelegramSendResult.failure(
-            message: 'Relay Test (${response.statusCode}): $errMsg',
+            message: _redactSecrets(
+              'Relay Test (${response.statusCode}): $errMsg',
+              [relaySecret],
+            ),
             statusCode: response.statusCode,
             rawResponse: data,
           );
         }
       } catch (e) {
         return TelegramSendResult.failure(
-          message: 'Gagal menghubungi Secure Relay untuk uji koneksi: $e',
+          message: _redactSecrets(
+            'Gagal menghubungi Secure Relay untuk uji koneksi: $e',
+            [relaySecret],
+          ),
           statusCode: 502,
         );
       }

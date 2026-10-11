@@ -126,8 +126,11 @@ void main() {
       final safeMode = loaded.telegramConfig.getSafeMode(loaded.isPublicDemo);
       expect(safeMode, TelegramIntegrationMode.mockSimulation);
       
-      // Verify botToken is still present in loaded config (not deleted)
-      expect(loaded.telegramConfig.botToken, 'dummy-token-for-test');
+      // SECURITY (Phase 1 hardening): a bot token found in an older saved
+      // config is now discarded rather than rehydrated, so it can never be used
+      // from the client even once. The mode fallback above still applies.
+      expect(loaded.telegramConfig.botToken, isNull,
+          reason: 'a legacy persisted bot token must be discarded on load');
     });
 
     test('Direct Bot API HTTP request is blocked in public demo mode', () async {

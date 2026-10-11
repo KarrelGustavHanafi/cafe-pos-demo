@@ -1,0 +1,34 @@
+name = "caffe-pos-telegram-relay"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECRETS — NEVER put these in this file.
+#
+# This TOML file IS committed to Git. Putting a credential in [vars] would leak
+# it into the repository history.
+#
+# Set each secret interactively (it will be prompted for and stored by
+# Cloudflare, never written to disk):
+#
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN     # the Telegram bot token
+#   npx wrangler secret put TELEGRAM_RELAY_SECRET  # client -> worker shared secret
+#   npx wrangler secret put AUTHORIZED_CHAT_IDS    # e.g. "-1001234567890"
+#
+# Generate a strong relay secret, for example:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+#
+# For LOCAL development only, copy .dev.vars.example to .dev.vars and fill it in.
+# `.dev.vars` is git-ignored and must never be committed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# For local `wrangler dev` runs the Workers runtime is reachable on the public
+# *.workers.dev subdomain. Uncomment BOTH lines to require an explicit custom
+# domain or a named route, and to stop serving from workers.dev:
+#
+# workers_dev = false
+# routes = [{ pattern = "telegram-relay.yourdomain.com/*", zone_name = "yourdomain.com" }]
+
+# Observability — recommended before production rollout.
+# [observability]
+# enabled = true

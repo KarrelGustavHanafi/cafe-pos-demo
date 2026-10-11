@@ -38,12 +38,17 @@ class TelegramNotificationService {
     List<({String name, double amount, String unit})>? deductions,
     List<LowStockItemData>? newlyLowStockItems,
   }) async {
-    // Duplicate prevention: ensure an order is notified exactly once
+    // Duplicate prevention: an order is notified at most once.
+    //
+    // DELIVERY SAFETY: the order number is recorded as processed only AFTER the
+    // send succeeds. Registering it before the attempt (the previous behaviour)
+    // meant a failed send silently burned the key, so no retry could ever happen
+    // and the owner silently lost that report. A failure therefore leaves the
+    // order eligible for a later retry.
     if (_processedOrderNumbers.contains(order.orderNumber)) {
       debugPrint('[TelegramNotification] Order ${order.orderNumber} already processed. Skipping duplicate.');
       return;
     }
-    _processedOrderNumbers.add(order.orderNumber);
 
     if (!_telegramService.isEnabled) {
       debugPrint('[TelegramNotification] Telegram is disabled. Skipping transaction notification.');
@@ -66,7 +71,10 @@ class TelegramNotificationService {
       );
 
       final result = await _telegramService.sendTransactionNotification(notifData);
-      if (!result.success) {
+      // Mark delivered only on success so a failed send can be retried.
+      if (result.success) {
+        _processedOrderNumbers.add(order.orderNumber);
+      } else {
         debugPrint('[TelegramNotification] Transaction notification failed: ${result.message}');
       }
     } catch (e, stack) {
@@ -92,19 +100,24 @@ class TelegramNotificationService {
 
     // 1c. Send Low Stock Alert (with duplicate spam suppression)
     if (newlyLowStockItems != null && newlyLowStockItems.isNotEmpty) {
-      final itemsToAlert = <LowStockItemData>[];
+      // Build the candidate list WITHOUT registering the IDs. Registration
+      // happens only after a successful send, so a failed alert can be retried.
+      final candidates = <LowStockItemData>[];
       for (final item in newlyLowStockItems) {
         final key = item.id ?? item.name;
         if (!_lowStockAlertedIds.contains(key)) {
-          _lowStockAlertedIds.add(key);
-          itemsToAlert.add(item);
+          candidates.add(item);
         }
       }
 
-      if (itemsToAlert.isNotEmpty) {
+      if (candidates.isNotEmpty) {
         try {
-          final result = await _telegramService.sendLowStockAlert(itemsToAlert);
-          if (!result.success) {
+          final result = await _telegramService.sendLowStockAlert(candidates);
+          if (result.success) {
+            for (final item in candidates) {
+              _lowStockAlertedIds.add(item.id ?? item.name);
+            }
+          } else {
             debugPrint('[TelegramNotification] Low stock alert failed: ${result.message}');
           }
         } catch (e, stack) {
@@ -159,12 +172,14 @@ class TelegramNotificationService {
     required int qrisSales,
     required int totalTransactions,
   }) async {
-    // Duplicate prevention: ensure a shift is notified exactly once
+    // Duplicate prevention: a shift is reported at most once.
+    //
+    // As with orders, the shift ID is registered only after a successful send so
+    // a failed report remains retryable.
     if (_processedShiftIds.contains(shift.shiftId)) {
       debugPrint('[TelegramNotification] Shift ${shift.shiftId} already processed. Skipping duplicate.');
       return null;
     }
-    _processedShiftIds.add(shift.shiftId);
 
     if (!_telegramService.isEnabled) {
       debugPrint('[TelegramNotification] Telegram is disabled. Skipping shift closed notification.');
@@ -193,7 +208,10 @@ class TelegramNotificationService {
       );
 
       final result = await _telegramService.sendShiftReport(data);
-      if (!result.success) {
+      // Mark delivered only on success so a failed report can be retried.
+      if (result.success) {
+        _processedShiftIds.add(shift.shiftId);
+      } else {
         debugPrint('[TelegramNotification] Shift closed notification failed: ${result.message}');
       }
       return result;

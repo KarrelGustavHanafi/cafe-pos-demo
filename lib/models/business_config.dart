@@ -110,10 +110,24 @@ class TelegramConfig {
   final String endpoint;
   final TelegramIntegrationMode integrationMode;
   final bool testMode;
-  // NOTE: DEMO ONLY token for local sandbox testing.
-  // In production, real bot secrets must never be stored in browser client storage;
-  // transactions will route via backend server or Edge Function.
+  // NOTE: SANDBOX ONLY — in-memory token for local Direct Bot API testing.
+  //
+  // This value is deliberately NEVER serialized to browser storage (see
+  // [toJson]) and is NEVER rehydrated from storage (see [fromJson]). Any token
+  // left in `localStorage` by an older build is ignored on load and discarded.
+  //
+  // The bot token for real deployments lives ONLY in the Cloudflare Worker's
+  // `TELEGRAM_BOT_TOKEN` secret and never reaches browser code. Use
+  // [TelegramIntegrationMode.relayWebhook] for anything beyond a local sandbox.
   final String? botToken;
+
+  /// Shared secret used to authenticate this client against the relay Worker.
+  ///
+  /// Unlike [botToken] this is intentionally persisted so the owner does not
+  /// retype it after every refresh. It authenticates the *application*, not a
+  // user, and it does not grant access to the Telegram bot itself — the bot
+  /// token stays server-side in the Worker.
+  final String? relaySecret;
 
   const TelegramConfig({
     this.enabled = true,
@@ -123,6 +137,7 @@ class TelegramConfig {
     this.integrationMode = TelegramIntegrationMode.mockSimulation,
     this.testMode = true,
     this.botToken,
+    this.relaySecret,
   });
 
   TelegramConfig copyWith({
@@ -133,6 +148,8 @@ class TelegramConfig {
     TelegramIntegrationMode? integrationMode,
     bool? testMode,
     String? botToken,
+    String? relaySecret,
+    bool clearRelaySecret = false,
   }) {
     return TelegramConfig(
       enabled: enabled ?? this.enabled,
@@ -142,6 +159,12 @@ class TelegramConfig {
       integrationMode: integrationMode ?? this.integrationMode,
       testMode: testMode ?? this.testMode,
       botToken: botToken ?? this.botToken,
+      // `clearRelaySecret` exists because a plain `relaySecret: null` is
+      // indistinguishable from "not supplied" in a `??` chain, so clearing the
+      // field in the UI would silently keep the previous secret — leaving no way
+      // to revoke a compromised secret from the app. An explicit flag keeps the
+      // clearing intent type-safe without a sentinel object.
+      relaySecret: clearRelaySecret ? null : (relaySecret ?? this.relaySecret),
     );
   }
 
@@ -155,19 +178,26 @@ class TelegramConfig {
   }
 
   Map<String, dynamic> toJson() {
-    final json = <String, dynamic>{
+    // SECURITY: `botToken` is NEVER written to browser storage.
+    //
+    // The Telegram bot token belongs only in the relay Worker's
+    // `TELEGRAM_BOT_TOKEN` secret. Persisting it here would expose it to any
+    // script on the origin (XSS), browser extensions, and shared-device forensics.
+    // Direct Bot API is therefore a non-durable sandbox mode only: a token entered
+    // there is used for the current session and discarded on reload.
+    //
+    // `relaySecret` is different: a client-to-worker shared secret that
+    // authenticates this application to the relay. It is persisted on purpose so
+    // the owner is not forced to retype it, and it grants no access to the bot.
+    return <String, dynamic>{
       'enabled': enabled,
       'botUsername': botUsername,
       'chatId': chatId,
       'endpoint': endpoint,
       'integrationMode': integrationMode.name,
       'testMode': testMode,
+      'relaySecret': relaySecret,
     };
-    // Only persist botToken for sandbox/direct mode — never for production relay
-    if (integrationMode != TelegramIntegrationMode.relayWebhook) {
-      json['botToken'] = botToken;
-    }
-    return json;
   }
 
   factory TelegramConfig.fromJson(Map<String, dynamic> json) {
@@ -181,6 +211,11 @@ class TelegramConfig {
       return fallback;
     }
 
+    // SECURITY: `botToken` is deliberately NOT read here.
+    //
+    // Older builds persisted the token into browser storage. Refusing to
+    // rehydrate it means any previously stored credential is ignored and
+    // effectively dead, so it cannot be used from the client even once.
     return TelegramConfig(
       enabled: parseBool(json['enabled'], true),
       botUsername: json['botUsername']?.toString() ?? '@CaffePosBot',
@@ -191,7 +226,7 @@ class TelegramConfig {
         orElse: () => TelegramIntegrationMode.mockSimulation,
       ),
       testMode: parseBool(json['testMode'], true),
-      botToken: json['botToken']?.toString(),
+      relaySecret: json['relaySecret']?.toString(),
     );
   }
 }

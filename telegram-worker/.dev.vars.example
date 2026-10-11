@@ -1,0 +1,33 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LOCAL DEVELOPMENT SECRETS — PLACEHOLDER VALUES ONLY
+#
+# Copy this file to `.dev.vars` for `wrangler dev`, then replace the placeholder
+# values with real ones. `.dev.vars` is git-ignored (.gitignore) and MUST NOT be
+# committed.
+#
+# For real deployments use Cloudflare Worker secrets instead, which are never
+# written to disk:
+#
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN
+#   npx wrangler secret put TELEGRAM_RELAY_SECRET
+#   npx wrangler secret put AUTHORIZED_CHAT_IDS
+#
+# There are deliberately NO real credentials in this file.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# The Telegram bot token obtained from @BotFather.
+# Replace: your-bot-token-here
+TELEGRAM_BOT_TOKEN="REPLACE_WITH_YOUR_BOT_TOKEN"
+
+# Shared secret proving a request came from the CAFFE POS client.
+# This value must also be entered in Owner > Settings > Telegram Integration.
+# Generate a strong value:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Replace: generate-a-random-64-char-hex-string
+TELEGRAM_RELAY_SECRET="REPLACE_WITH_A_RANDOM_64_CHARACTER_STRING"
+
+# Comma-separated allowlist of Owner Telegram chat IDs.
+# Messages are ONLY ever delivered to one of these IDs; a client cannot widen
+# this list. Get your ID by messaging @userinfobot or @getidsbot.
+# Replace: -1000000000000
+AUTHORIZED_CHAT_IDS="-1000000000000"
