@@ -84,6 +84,10 @@ class ShiftReportData {
   final int variance;
   final int cashSales;
   final int qrisSales;
+
+  /// Debit-card sales for the shift. Non-cash tender never enters the physical
+  /// till, so it is reported for completeness but excluded from expected cash.
+  final int debitSales;
   final int totalSales;
   final int totalTransactions;
   final String? notes;
@@ -99,6 +103,7 @@ class ShiftReportData {
     required this.variance,
     required this.cashSales,
     this.qrisSales = 0,
+    this.debitSales = 0,
     this.totalSales = 0,
     required this.totalTransactions,
     this.notes,

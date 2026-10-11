@@ -10,8 +10,14 @@ import 'telegram_service.dart';
 class TelegramNotificationService {
   TelegramService _telegramService;
 
-  /// Tracks order numbers that have already been notified to avoid duplicates.
-  final Set<String> _processedOrderNumbers = <String>{};
+  /// Tracks the stable internal identities of orders already notified, so a
+  /// repeated notification for the SAME sale cannot duplicate.
+  ///
+  /// Keyed on `Order.id`, never on `Order.orderNumber`: the display number is
+  /// reusable (a rejected stale order is re-prepared without advancing the
+  /// sequence), so keying on it let one real sale suppress another sale's
+  /// notification entirely.
+  final Set<String> _processedOrderIds = <String>{};
 
   /// Tracks ingredient / product IDs currently below threshold to prevent repeat alert spam.
   final Set<String> _lowStockAlertedIds = <String>{};
@@ -28,7 +34,10 @@ class TelegramNotificationService {
   bool get isEnabled => _telegramService.isEnabled;
 
   /// Check if an order has already been processed for notifications.
-  bool isOrderProcessed(String orderNumber) => _processedOrderNumbers.contains(orderNumber);
+  ///
+  /// Takes the stable [orderId]; see [_processedOrderIds] for why the display
+  /// order number is not a safe key.
+  bool isOrderProcessed(String orderId) => _processedOrderIds.contains(orderId);
 
   /// ─── 1. TRANSACTION COMPLETED (Payment Success) ───────────────────────────
   /// Triggered strictly AFTER payment is successfully completed.
@@ -45,8 +54,8 @@ class TelegramNotificationService {
     // meant a failed send silently burned the key, so no retry could ever happen
     // and the owner silently lost that report. A failure therefore leaves the
     // order eligible for a later retry.
-    if (_processedOrderNumbers.contains(order.orderNumber)) {
-      debugPrint('[TelegramNotification] Order ${order.orderNumber} already processed. Skipping duplicate.');
+    if (_processedOrderIds.contains(order.id)) {
+      debugPrint('[TelegramNotification] Order ${order.id} already processed. Skipping duplicate.');
       return;
     }
 
@@ -73,7 +82,7 @@ class TelegramNotificationService {
       final result = await _telegramService.sendTransactionNotification(notifData);
       // Mark delivered only on success so a failed send can be retried.
       if (result.success) {
-        _processedOrderNumbers.add(order.orderNumber);
+        _processedOrderIds.add(order.id);
       } else {
         debugPrint('[TelegramNotification] Transaction notification failed: ${result.message}');
       }
@@ -140,7 +149,7 @@ class TelegramNotificationService {
 
   /// Clear all duplicate and alert tracking (useful for test resets).
   void resetTracking() {
-    _processedOrderNumbers.clear();
+    _processedOrderIds.clear();
     _lowStockAlertedIds.clear();
     _processedShiftIds.clear();
   }
@@ -171,6 +180,7 @@ class TelegramNotificationService {
     required int cashSales,
     required int qrisSales,
     required int totalTransactions,
+    int debitSales = 0,
   }) async {
     // Duplicate prevention: a shift is reported at most once.
     //
@@ -202,6 +212,7 @@ class TelegramNotificationService {
         variance: variance,
         cashSales: cashSales,
         qrisSales: qrisSales,
+        debitSales: debitSales,
         totalSales: totalSales,
         totalTransactions: totalTransactions,
         notes: shift.closingNotes,

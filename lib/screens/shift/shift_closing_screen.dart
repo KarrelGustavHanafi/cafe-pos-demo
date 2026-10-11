@@ -16,6 +16,63 @@ class ShiftClosingScreen extends StatefulWidget {
     this.onLogout,
   });
 
+  /// Parses and validates the opening float for a new shift.
+  ///
+  /// Returns `null` when [raw] is not a usable amount: empty, non-numeric, zero
+  /// or negative. A drawer that starts at or below zero is not a real float, and
+  /// silently coercing it to 0 would hide the mistake in the next
+  /// reconciliation. Tolerates formatting separators ("300.000", "Rp 300000").
+  ///
+  /// A leading minus is rejected outright rather than stripped: discarding the
+  /// sign would turn "-50000" into a positive float and quietly book money that
+  /// was never counted.
+  static int? parseOpeningCash(String raw) {
+    return _parseRupiah(raw, allowZero: false);
+  }
+
+  /// Parses the physically counted cash in the drawer.
+  ///
+  /// Unlike the opening float, a zero count is legitimate (an empty drawer is a
+  /// real, reportable outcome), so `allowZero` is true here.
+  static int? parseActualCash(String raw) {
+    return _parseRupiah(raw, allowZero: true);
+  }
+
+  /// Strict Rupiah integer parser shared by both cash fields.
+  ///
+  /// Accepts plain digits and the grouping separators this UI already renders
+  /// ("300000", "300.000", "Rp 300000"). It deliberately does NOT strip stray
+  /// characters and then coerce a parse failure to 0: doing so turned overflow,
+  /// negatives and scientific-notation-like text ("1e5" -> 15) into a silent,
+  /// plausible-looking zero and so into a false cash variance at closing time.
+  ///
+  /// Returns `null` for anything that is not a representable non-negative
+  /// integer, letting the caller surface an error instead.
+  static int? _parseRupiah(String raw, {required bool allowZero}) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    // A leading minus is a real negative count, not a formatting artifact.
+    if (trimmed.startsWith('-')) return null;
+
+    // Keep only digits and grouping separators, then verify the remainder is a
+    // well-formed integer rather than silently discarding unknown characters.
+    final stripped = trimmed.replaceFirst(RegExp(r'^[^\d]+'), '');
+    if (!RegExp(r'^[\d.,\s]+$').hasMatch(stripped)) return null;
+
+    final digits = stripped.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.isEmpty) return null;
+
+    // Reject absurd digit strings before parsing: `int.tryParse` returns null
+    // on overflow, and that null must not degrade into 0.
+    if (digits.length > 18) return null;
+
+    final value = int.tryParse(digits);
+    if (value == null) return null;
+    if (value < 0) return null;
+    if (!allowZero && value == 0) return null;
+    return value;
+  }
+
   @override
   State<ShiftClosingScreen> createState() => _ShiftClosingScreenState();
 }
@@ -25,12 +82,88 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
   final _notesController = TextEditingController();
   int _actualCash = 0;
 
+  /// Set when the counted-cash field holds text that is not a valid Rupiah
+  /// amount. Surfaced inline, and the close action stays disabled while it is
+  /// set, so an unparseable entry can never be booked as a zero count.
+  String? _actualCashError;
+
   @override
   void initState() {
     super.initState();
-    final expected = widget.pos.currentShift.startingCash + widget.pos.todayCashSales;
+    // Shift-scoped, not "today"-scoped: expected drawer cash must reflect only
+    // the cash taken during THIS shift.
+    final expected =
+        widget.pos.expectedEndingCashForShift(widget.pos.currentShift);
     _actualCash = expected;
     _actualCashController.text = expected.toString();
+  }
+
+  Future<void> _promptForOpeningCash() async {
+    final controller = TextEditingController();
+    String? error;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Modal Awal Shift Baru'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Masukkan jumlah uang tunai yang ditaruh di laci kas '
+                    'sebelum shift dibuka. Nilai ini menjadi Modal Awal pada '
+                    'rekonsiliasi tutup shift.',
+                    style: TextStyle(fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Modal Awal (Rp)',
+                      errorText: error,
+                    ),
+                    onChanged: (_) {
+                      if (error != null) setState(() => error = null);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final parsed = ShiftClosingScreen.parseOpeningCash(controller.text);
+                    if (parsed == null) {
+                      setState(() =>
+                          error = 'Masukkan nominal lebih dari 0.');
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  child: const Text('Buka Shift'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    final openingCash = ShiftClosingScreen.parseOpeningCash(controller.text);
+    controller.dispose();
+
+    if (confirmed != true || openingCash == null) return;
+    widget.pos.startNewShift(startingCash: openingCash);
+    widget.onBackToDashboard();
   }
 
   @override
@@ -45,8 +178,13 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
     final shift = widget.pos.currentShift;
     final timeFormat = DateFormat('dd MMM yyyy, HH:mm');
     final startingCash = shift.startingCash;
-    final cashSales = widget.pos.todayCashSales;
+    // Every figure below is scoped to this shift by Order.shiftId, so a second
+    // shift on the same calendar day (or one crossing midnight) never leaks in.
+    final cashSales = widget.pos.cashSalesForShift(shift.shiftId);
+    final qrisSales = widget.pos.qrisSalesForShift(shift.shiftId);
+    final debitSales = widget.pos.debitSalesForShift(shift.shiftId);
     final expectedEndingCash = startingCash + cashSales;
+    final unattributed = widget.pos.unattributedCashTotal;
     final variance = _actualCash - expectedEndingCash;
 
     return Scaffold(
@@ -139,10 +277,21 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
                           const SizedBox(height: 6),
                           _buildLine('Total Penjualan Tunai (Cash)', AppCurrency.format(cashSales)),
                           const SizedBox(height: 6),
-                          _buildLine('Total Transaksi QRIS', AppCurrency.format(widget.pos.todayQrisSales)),
+                          _buildLine('Total Transaksi QRIS', AppCurrency.format(qrisSales)),
                           const SizedBox(height: 6),
-                          _buildLine('Total Transaksi Kartu Debit', AppCurrency.format(widget.pos.todayDebitSales)),
+                          _buildLine('Total Transaksi Kartu Debit', AppCurrency.format(debitSales)),
                           const Divider(height: 16, color: AppColors.border),
+                          // Reconciliation policy, stated openly: unknown-origin
+                          // cash is never folded into this shift's drawer total.
+                          // Showing it keeps the exclusion auditable instead of
+                          // silently making the numbers look balanced.
+                          if (unattributed > 0) ...[
+                            _buildLine(
+                              'Kas Tanpa Atribut Shift (di luar hitungan)',
+                              AppCurrency.format(unattributed),
+                            ),
+                            const SizedBox(height: 6),
+                          ],
                           Row(
                             children: [
                               const Expanded(
@@ -184,16 +333,38 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
                       controller: _actualCashController,
                       enabled: !shift.isClosed,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         prefixText: 'Rp ',
                         hintText: '0',
+                        errorText: _actualCashError,
                       ),
                       onChanged: (val) {
+                        final parsed = ShiftClosingScreen.parseActualCash(val);
                         setState(() {
-                          _actualCash = int.tryParse(val.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                          // Only a genuinely parsed amount updates the counted
+                          // figure; an unparseable entry leaves the previous
+                          // value untouched and raises an error instead of
+                          // quietly becoming zero.
+                          if (parsed != null) {
+                            _actualCash = parsed;
+                            _actualCashError = null;
+                          } else {
+                            _actualCashError = val.trim().isEmpty
+                                ? null
+                                : 'Masukkan nominal rupiah yang valid.';
+                          }
                         });
                       },
                     ),
+                    if (_actualCashError != null)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Periksa kembali hitungan kas sebelum menutup shift.',
+                          style: TextStyle(
+                              fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                      ),
 
                     const SizedBox(height: 12),
 
@@ -271,7 +442,12 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
                       SizedBox(
                         height: 46,
                         child: ElevatedButton.icon(
-                          onPressed: () async {
+                          // Blocked while the counted-cash field holds an
+                          // amount that could not be parsed, so a malformed or
+                          // overflowing entry is never silently closed as zero.
+                          onPressed: _actualCashError != null
+                              ? null
+                              : () async {
                             final result = await widget.pos.closeShift(
                               actualEndingCash: _actualCash,
                               notes: _notesController.text,
@@ -353,10 +529,7 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
                                 );
 
                                 final newShiftButton = ElevatedButton.icon(
-                                  onPressed: () {
-                                    widget.pos.startNewShift(startingCash: 300000);
-                                    widget.onBackToDashboard();
-                                  },
+                                  onPressed: () => _promptForOpeningCash(),
                                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
                                   label: const Text('Buka Shift Baru', style: TextStyle(fontWeight: FontWeight.w700)),
                                   style: ElevatedButton.styleFrom(

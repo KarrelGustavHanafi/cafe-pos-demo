@@ -17,7 +17,12 @@ class CashierOrdersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('HH:mm');
-    final paidOrders = pos.orders.where((o) => o.status == OrderStatus.paid).toList();
+    // Completed sales only, across the whole history, newest first.
+    //
+    // Previously re-stated the paid rule inline. `pos.paidOrders` is the same
+    // filter (status only — no date window, no shift scoping), now sourced from
+    // the one place that defines it.
+    final paidOrders = pos.paidOrders;
 
     return Scaffold(
       backgroundColor: AppColors.background,

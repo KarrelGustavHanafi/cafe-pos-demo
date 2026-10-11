@@ -40,6 +40,16 @@ class ReceiptData {
   final String businessName;
   final String address;
   final String phone;
+
+  /// Stable internal identity of the order this receipt was produced for.
+  ///
+  /// Carried so a stored receipt can be located by the same key the rest of the
+  /// application uses. [orderNumber] is a display label and can legitimately
+  /// repeat (a rejected stale-shift order is re-prepared without advancing the
+  /// sequence), so it must never be used to identify a specific transaction.
+  ///
+  /// Never printed; the visible receipt header still shows [orderNumber].
+  final String orderId;
   final String orderNumber;
   final DateTime dateTime;
   final String cashierName;
@@ -62,6 +72,7 @@ class ReceiptData {
     required this.businessName,
     required this.address,
     required this.phone,
+    this.orderId = '',
     required this.orderNumber,
     required this.dateTime,
     required this.cashierName,
@@ -97,6 +108,7 @@ class ReceiptData {
       businessName: config.businessName,
       address: config.address,
       phone: config.phone,
+      orderId: order.id,
       orderNumber: order.orderNumber,
       dateTime: order.createdAt,
       cashierName: order.cashierName,

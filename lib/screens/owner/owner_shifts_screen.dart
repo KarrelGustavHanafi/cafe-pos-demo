@@ -67,23 +67,40 @@ class OwnerShiftsScreen extends StatelessWidget {
     );
   }
 
-  /// Placeholder for figures the current data model cannot support.
+  /// Placeholder for figures the data model genuinely cannot supply.
   ///
-  /// Closed shifts store no sales of their own and orders carry no shift
-  /// reference, so per-shift sales and the cash variance derived from them
-  /// cannot be calculated honestly. Showing a number here would be invented.
+  /// A seeded historical shift predates close-time snapshots, so it has no
+  /// recorded sales breakdown — only an authored `actualEndingCash`. Showing a
+  /// number there would be invented, so "not available" is shown instead.
   static const String _unavailable = 'Tidak tersedia';
 
   Widget _buildShiftCard(BuildContext context, ShiftInfo shift) {
     final isOpen = !shift.isClosed;
 
-    // An open shift is the live one, so today's running figures apply to it.
-    // A closed shift has no order linkage, so only the values recorded at
-    // closing time itself are real.
-    final totalShiftSales = isOpen ? pos.todaySalesTotal : null;
-    final cashSales = isOpen ? pos.todayCashSales : null;
-    final qrisSales = isOpen ? pos.todayQrisSales : null;
-    final expectedCash = isOpen ? shift.startingCash + pos.todayCashSales : null;
+    // An OPEN shift is live, so its figures are read from the orders currently
+    // attributed to it.
+    //
+    // A CLOSED shift is read ONLY from its frozen [ShiftCloseSummary]. Those
+    // figures were captured at close time and must not be recomputed: doing so
+    // made a historical shift's totals drift whenever unrelated orders were
+    // added or another shift was opened.
+    //
+    // A closed shift with no summary (a seeded historical shift) keeps every
+    // figure null, which renders as "not available" rather than a guess.
+    //
+    // Both paths are scoped by Order.shiftId rather than calendar date: two
+    // shifts can share one date, and a shift can cross midnight.
+    final summary = shift.summary;
+    final totalShiftSales = isOpen
+        ? pos.totalSalesForShift(shift.shiftId)
+        : summary?.totalSales;
+    final cashSales =
+        isOpen ? pos.cashSalesForShift(shift.shiftId) : summary?.cashSales;
+    final qrisSales =
+        isOpen ? pos.qrisSalesForShift(shift.shiftId) : summary?.qrisSales;
+    final expectedCash = isOpen
+        ? pos.expectedEndingCashForShift(shift)
+        : shift.expectedEndingCash;
     final actualCash =
         isOpen ? expectedCash : (shift.actualEndingCash ?? expectedCash);
     final variance = (expectedCash != null && actualCash != null)

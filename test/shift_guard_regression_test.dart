@@ -233,9 +233,25 @@ void main() {
         throwsA(isA<ShiftSaleBlockedException>()),
       );
 
-      // Once a new shift is opened, the same cart can still be settled
-      // normally (the in-flight order is not corrupted by the block).
+      // Once a new shift is opened, the in-flight order is still refused: it was
+      // prepared under the closed shift, so settling it now would post the sale
+      // into a drawer that no longer exists.
       pos.startNewShift(startingCash: 300000);
+      expect(
+        () => pos.completePayment(
+          method: PaymentMethod.cash,
+          paidAmount: pos.cartGrandTotal,
+          changeAmount: 0,
+        ),
+        throwsA(isA<StaleShiftOrderException>()),
+      );
+      // Refused before any mutation: nothing was deducted and nothing was sold.
+      expect(pos.products.firstWhere((p) => p.id == product.id).stock, productStockBefore);
+
+      // Recovery: the cashier prepares the sale again under the open shift and
+      // it settles normally, landing in the shift that is actually active.
+      final freshOrder = pos.prepareCheckoutOrder();
+      expect(freshOrder.shiftId, pos.currentShift.shiftId);
       final settled = pos.completePayment(
         method: PaymentMethod.cash,
         paidAmount: pos.cartGrandTotal,
@@ -243,7 +259,7 @@ void main() {
       );
 
       expect(settled.status, OrderStatus.paid);
-      expect(settled.orderNumber, pendingOrder.orderNumber);
+      expect(settled.shiftId, pos.currentShift.shiftId);
       expect(pos.products.firstWhere((p) => p.id == product.id).stock, productStockBefore - 1);
     });
 

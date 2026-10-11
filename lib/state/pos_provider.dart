@@ -24,6 +24,7 @@ import '../services/telegram/telegram_service.dart';
 import '../services/telegram/telegram_bot_service.dart';
 import '../services/telegram/telegram_notification_service.dart';
 import '../services/receipt/receipt_service.dart';
+import '../repositories/order_repository.dart';
 import '../utils/cart_calculator.dart';
 import '../utils/recipe_calculator.dart';
 import '../utils/shift_sale_guard.dart';
@@ -31,7 +32,21 @@ import '../utils/shift_sale_guard.dart';
 class PosProvider extends ChangeNotifier {
   User? _currentUser;
   late List<Product> _products;
-  late List<Order> _orders;
+
+  /// Storage and query boundary for orders.
+  ///
+  /// The provider owns *business meaning* — shift lifecycle, sale eligibility,
+  /// settlement and reporting semantics. The repository owns *storage and
+  /// selection*: which orders exist, and which of them match a given filter.
+  ///
+  /// That split is what stops the paid-only and shift-membership rules from
+  /// being re-implemented per report and drifting apart.
+  ///
+  /// Replaceable in tests with another [OrderRepository] implementation; the
+  /// default is process-local and non-durable, which is an accepted demo
+  /// limitation rather than a persistence guarantee.
+  final OrderRepository _orderRepository;
+
   late ShiftInfo _currentShift;
   late List<ShiftInfo> _pastShifts;
   late List<ProductCategory> _categories;
@@ -61,7 +76,8 @@ class PosProvider extends ChangeNotifier {
     AppStorage? storage,
     BusinessConfigService? configService,
     List<Order>? initialOrders,
-  }) {
+    OrderRepository? orderRepository,
+  })  : _orderRepository = orderRepository ?? InMemoryOrderRepository() {
     _initData(
       storage: storage,
       configService: configService,
@@ -89,11 +105,13 @@ class PosProvider extends ChangeNotifier {
     _products = MockData.getInitialProducts();
     _currentShift = MockData.getInitialShift();
     _pastShifts = MockData.getPastShifts();
-    // Replace the mock orders when a caller injects its own, so the two sets
-    // are never combined and period totals remain predictable in tests.
-    _orders = initialOrders != null
-        ? List<Order>.from(initialOrders)
-        : MockData.getInitialOrders(_products);
+    // Orders are seeded through the repository in the constructor, before
+    // _initData runs, because seed orders need `_products` to resolve their
+    // line items. Injected orders *replace* the mock set outright rather than
+    // appending to it, so seeded totals stay predictable in tests.
+    _orderRepository.replaceAll(
+      initialOrders ?? MockData.getInitialOrders(_products),
+    );
     _categories = [
       ProductCategory.coffee,
       ProductCategory.nonCoffee,
@@ -120,7 +138,20 @@ class PosProvider extends ChangeNotifier {
   bool get isAuthenticated => _currentUser != null;
   List<Product> get products => List.unmodifiable(_products);
   List<Product> get activeProducts => _products.where((p) => p.isActive).toList();
-  List<Order> get orders => List.unmodifiable(_orders);
+  List<Order> get orders => _orderRepository.all;
+
+  /// Every paid order, newest first, across the whole history.
+  ///
+  /// Scoped by status ONLY — no date window and no shift filter — so it answers
+  /// "every completed sale" for order-history screens. Use
+  /// [getPaidOrdersForPeriod] for a reporting window and
+  /// [getPaidOrdersForShift] for a drawer reconciliation; those deliberately
+  /// answer different questions and must not be substituted here.
+  ///
+  /// Exposes the repository's single definition of "paid" so screens stop
+  /// re-stating the rule inline, while keeping the repository itself private
+  /// to the state layer.
+  List<Order> get paidOrders => _orderRepository.paidOrders;
   ShiftInfo get currentShift => _currentShift;
   List<ShiftInfo> get pastShifts => List.unmodifiable(_pastShifts);
   List<ShiftInfo> get allShifts => [_currentShift, ..._pastShifts];
@@ -365,7 +396,7 @@ class PosProvider extends ChangeNotifier {
     final dateStr = '${now.year}'
         '${now.month.toString().padLeft(2, '0')}'
         '${now.day.toString().padLeft(2, '0')}';
-    final count = _orders.length + 1;
+    final count = _orderRepository.count + 1;
     final seqStr = count.toString().padLeft(4, '0');
     return '${_businessConfig.orderNumberPrefix}-$dateStr-$seqStr';
   }
@@ -390,6 +421,10 @@ class PosProvider extends ChangeNotifier {
       serviceChargeRate: _businessConfig.serviceChargeRate,
       isTaxEnabled: _businessConfig.isTaxEnabled,
       isServiceEnabled: _businessConfig.isServiceEnabled,
+      // Bind the sale to the shift that is open right now. Cash reconciliation
+      // is scoped by this, not by date, so two shifts on the same calendar day
+      // (or one crossing midnight) never share a drawer total.
+      shiftId: _currentShift.shiftId,
     );
     _currentOrder = order;
     notifyListeners();
@@ -409,6 +444,39 @@ class PosProvider extends ChangeNotifier {
   /// (including a stock sufficiency check), then applied inside a snapshot
   /// guarded block. Any error during apply rolls the whole sale back, so a
   /// failed checkout can never leave a paid order without its inventory.
+  ///
+  /// ─── ATOMICITY CONTRACT ──────────────────────────────────────────────────
+  /// The rollback machinery is positional: [_captureSaleSnapshot] records list
+  /// lengths and stock values keyed by collection index, and
+  /// [_restoreSaleSnapshot] truncates back to those lengths. That is only sound
+  /// while the whole commit is one uninterrupted synchronous step. The
+  /// invariants that make it sound, each of which is load-bearing:
+  ///
+  ///  1. **Plan before mutate.** [_buildSalePlan] is pure — it reads stock and
+  ///     builds a plan, and writes nothing. So a stock shortage or any other
+  ///     validation failure happens before the snapshot exists and cannot leave
+  ///     partial state.
+  ///  2. **No interleaving.** There must be NO `await` between
+  ///     [_captureSaleSnapshot], [_applySalePlan] and the rollback. Dart is
+  ///     single-threaded, so a synchronous commit means no other order can be
+  ///     inserted mid-window; an `await` here would let one, and the
+  ///     length-based [OrderRepository.truncateTo] would then delete the other
+  ///     sale's order as well. This is why real payment confirmation must
+  ///     happen BEFORE this method is called, never inside it.
+  ///  3. **Stable indexes.** Stock is restored by collection index, so
+  ///     `_products`/`_rawMaterials` must not be reordered inside the window.
+  ///     Nothing reachable from [_applySalePlan] does that.
+  ///  4. **Restore, then rethrow.** On failure the full snapshot is restored
+  ///     before the original exception propagates; the caller sees the real
+  ///     cause, not a wrapper.
+  ///  5. **Notification is never authoritative.** The Telegram call is
+  ///     `unawaited` and happens only after a successful commit. It can neither
+  ///     fail a sale nor roll one back.
+  ///
+  /// Tests in `test/settlement_atomicity_regression_test.dart` pin the state
+  /// half of this contract. This comment records the architectural half; if
+  /// any invariant above is broken, the length-based rollback must be replaced
+  /// (e.g. delete-by-id) rather than the tests updated to match.
   Order completePayment({
     required PaymentMethod method,
     required int paidAmount,
@@ -440,6 +508,30 @@ class PosProvider extends ChangeNotifier {
     if (method == PaymentMethod.cash && paidAmount < order.grandTotal) {
       throw InvalidPaymentException(
         'Uang diterima kurang dari total pembayaran (${order.grandTotal}).',
+      );
+    }
+
+    // Guard: the order must still belong to the shift that is open NOW.
+    //
+    // `prepareCheckoutOrder` binds the sale to the shift active at that moment.
+    // If that shift closed and another opened before payment, settling it here
+    // would post the sale into a closed drawer and corrupt that shift's
+    // reconciliation. Checked before any mutation so stock, cart and sales
+    // history stay untouched and the cashier can safely prepare again.
+    //
+    // An order with no shift attribution predates shift scoping and cannot be
+    // proven to belong to the open shift, so it is refused rather than guessed.
+    final orderShiftId = order.shiftId;
+    if (orderShiftId == null) {
+      throw StaleShiftOrderException(
+        preparedUnderShiftId: '-',
+        activeShiftId: _currentShift.shiftId,
+      );
+    }
+    if (orderShiftId != _currentShift.shiftId || _currentShift.isClosed) {
+      throw StaleShiftOrderException(
+        preparedUnderShiftId: orderShiftId,
+        activeShiftId: _currentShift.shiftId,
       );
     }
 
@@ -476,6 +568,12 @@ class PosProvider extends ChangeNotifier {
 
   /// Computes every inventory/history mutation for [order] without applying it,
   /// and verifies that finished-product stock and recipe ingredients suffice.
+  ///
+  /// MUST stay side-effect free. Atomicity depends on every validation failure
+  /// occurring here — before the snapshot is captured — so a rejected sale can
+  /// never have already touched stock, order history or the cart. Writing to
+  /// `_products`, `_rawMaterials`, `_stockAdjustments`, `_orderRepository` or
+  /// `_currentOrder` in this method would silently defeat the rollback.
   _SalePlan _buildSalePlan(Order order) {
     // Aggregate ingredient demand per material across every cart line, so two
     // lines sharing an ingredient are validated (and deducted) as one total.
@@ -683,7 +781,7 @@ class PosProvider extends ChangeNotifier {
       );
     }
 
-    _orders.insert(0, finishedOrder);
+    _orderRepository.insert(finishedOrder);
     _currentOrder = finishedOrder;
 
     _cart.clear();
@@ -714,14 +812,62 @@ class PosProvider extends ChangeNotifier {
   /// Test-only hook invoked once the sale plan has been applied but before the
   /// order is committed. Throwing from it exercises the rollback path.
   ///
+  /// It fires after finished-product and raw-material stock have already been
+  /// written, but before stock adjustments and the order record are appended —
+  /// i.e. it reproduces a genuine *partial* mutation, which is the only case
+  /// where rollback is actually load-bearing.
+  ///
   /// Never set in production; there is no real API or I/O failure modelled
   /// inside `completePayment`, so this seam is the only way to drive the
   /// partial-commit scenario deterministically.
   @visibleForTesting
   void Function()? debugThrowAfterInventoryApply;
 
+  /// Test-only: injects an order with an exact total, shift, status and
+  /// timestamp.
+  ///
+  /// Reconciliation and reporting rules must be provable with orders that span
+  /// shifts, dates and statuses, which the seed data cannot express on its own.
+  ///
+  /// The [Order] is constructed directly (tax and service charge zeroed) so the
+  /// caller's `grandTotal` is the figure the model actually stores. Deriving it
+  /// from a product price instead would force tests to assert against prices
+  /// they do not control.
+  ///
+  /// Never called outside tests.
+  @visibleForTesting
+  void debugSeedOrderForTest({
+    required PaymentMethod paymentMethod,
+    required int grandTotal,
+    required DateTime createdAt,
+    String? shiftId,
+    OrderStatus status = OrderStatus.paid,
+  }) {
+    final product = _products.first;
+    final order = Order(
+      orderNumber: 'ORD-TEST-${_orderRepository.count + 1}',
+      tableNumber: 'Takeaway',
+      items: [CartItem(product: product, quantity: 1)],
+      subtotal: grandTotal,
+      serviceCharge: 0,
+      tax: 0,
+      grandTotal: grandTotal,
+      paymentMethod: paymentMethod,
+      status: status,
+      paidAmount: status == OrderStatus.paid ? grandTotal : 0,
+      createdAt: createdAt,
+      cashierName: 'Siti Rahma (Kasir)',
+      shiftId: shiftId,
+    );
+    _orderRepository.insert(order);
+  }
+
   /// Captures the minimal state a sale can mutate, so a failed apply can be
   /// undone completely.
+  ///
+  /// Records stock keyed by collection index and list lengths rather than by
+  /// identity, which is why [completePayment] must stay synchronous and why
+  /// `_products`/`_rawMaterials` must not be reordered inside the window.
   _SaleSnapshot _captureSaleSnapshot(_SalePlan plan) {
     return _SaleSnapshot(
       productStocks: {
@@ -732,13 +878,19 @@ class PosProvider extends ChangeNotifier {
         for (final d in plan.materialDeductions)
           d.collectionIndex: _rawMaterials[d.collectionIndex].stock,
       },
-      ordersLength: _orders.length,
+      ordersLength: _orderRepository.count,
       adjustmentsLength: _stockAdjustments.length,
       currentOrder: _currentOrder,
       cart: List<CartItem>.from(_cart),
     );
   }
 
+  /// Restores everything [_applySalePlan] may have mutated, then lets the caller
+  /// rethrow the original failure.
+  ///
+  /// Must itself not throw, or the sale is left half-restored. That is why
+  /// [OrderRepository.truncateTo] validates its target at runtime in every
+  /// build mode rather than relying on `assert`.
   void _restoreSaleSnapshot(_SaleSnapshot snapshot) {
     snapshot.productStocks.forEach((index, stock) {
       _products[index].stock = stock;
@@ -746,9 +898,7 @@ class PosProvider extends ChangeNotifier {
     snapshot.materialStocks.forEach((index, stock) {
       _rawMaterials[index].stock = stock;
     });
-    if (_orders.length > snapshot.ordersLength) {
-      _orders.removeRange(snapshot.ordersLength, _orders.length);
-    }
+    _orderRepository.truncateTo(snapshot.ordersLength);
     if (_stockAdjustments.length > snapshot.adjustmentsLength) {
       _stockAdjustments.removeRange(
           snapshot.adjustmentsLength, _stockAdjustments.length);
@@ -1237,8 +1387,13 @@ class PosProvider extends ChangeNotifier {
     return _receiptService.printOrderReceipt(order, _businessConfig);
   }
 
-  Future<PrinterResult> reprintReceipt(String orderNumber) async {
-    return _receiptService.reprintReceipt(orderNumber);
+  /// Reprints a stored receipt by the order's stable internal identity.
+  ///
+  /// Takes `Order.id`, never the display `orderNumber`, which can legitimately
+  /// repeat across two distinct sales. Not currently reachable from the UI; the
+  /// contract is fixed here so a future caller cannot pass a display number.
+  Future<PrinterResult> reprintReceipt(String orderId) async {
+    return _receiptService.reprintReceipt(orderId);
   }
 
   Future<PrinterResult> testPrinter() async {
@@ -1324,23 +1479,63 @@ class PosProvider extends ChangeNotifier {
       return null;
     }
 
+    // Capture the closing shift's own figures BEFORE mutating state.
+    //
+    // These must be shift-scoped, not `today...`: a shift report that mixes in
+    // another shift's sales (or misses sales from a previous calendar day)
+    // contradicts the reconciliation shown on screen. Scoped by `shiftId`
+    // membership with the same paid/cash/QRIS eligibility rules as
+    // `expectedEndingCashForShift`.
+    //
+    // The result is frozen onto the shift as [ShiftCloseSummary] so a CLOSED
+    // shift's history stops depending on the live order list. Without this,
+    // historical figures were recomputed on demand and silently changed
+    // whenever unrelated orders were added or a later shift was opened.
+    final closingShiftId = _currentShift.shiftId;
+    final shiftTotalSales = totalSalesForShift(closingShiftId);
+    final shiftCashSales = cashSalesForShift(closingShiftId);
+    final shiftQrisSales = qrisSalesForShift(closingShiftId);
+    final shiftDebitSales = debitSalesForShift(closingShiftId);
+    final shiftTransactions = transactionCountForShift(closingShiftId);
+
+    final closeSummary = ShiftCloseSummary(
+      totalSales: shiftTotalSales,
+      cashSales: shiftCashSales,
+      qrisSales: shiftQrisSales,
+      debitSales: shiftDebitSales,
+      paidTransactionCount: shiftTransactions,
+    );
+
     _currentShift = _currentShift.copyWith(
       isClosed: true,
       closedAt: DateTime.now(),
       actualEndingCash: actualEndingCash,
       closingNotes: notes,
+      summary: closeSummary,
     );
     _pastShifts.insert(0, _currentShift);
     notifyListeners();
 
-    // Automatic Telegram Shift Closed notification
-    return await _telegramNotificationService.onShiftClosed(
-      _currentShift,
-      totalSales: todaySalesTotal,
-      cashSales: todayCashSales,
-      qrisSales: todayQrisSales,
-      totalTransactions: todayTransactionsCount,
-    );
+    // Automatic Telegram Shift Closed notification.
+    //
+    // The shift is already archived and irreversible at this point, so a
+    // notification failure is reported but never allowed to undo the close.
+    // `onShiftClosed` isolates its own transport errors internally; this
+    // try/catch guards against any unexpected throw from the formatter so a
+    // reporting problem cannot roll back a completed business operation.
+    try {
+      return await _telegramNotificationService.onShiftClosed(
+        _currentShift,
+        totalSales: shiftTotalSales,
+        cashSales: shiftCashSales,
+        qrisSales: shiftQrisSales,
+        debitSales: shiftDebitSales,
+        totalTransactions: shiftTransactions,
+      );
+    } catch (_) {
+      // Shift is closed and archived; swallow so the caller still sees success.
+      return null;
+    }
   }
 
   /// Opens a fresh shift, replacing the previously closed one.
@@ -1370,68 +1565,58 @@ class PosProvider extends ChangeNotifier {
   // ==========================================
   // SALES ANALYTICS & EXECUTIVE METRICS
   // ==========================================
-  int get todaySalesTotal => _orders
-      .where((o) => o.status == OrderStatus.paid)
-      .fold<int>(0, (sum, o) => sum + o.grandTotal);
 
-  int get todayGrossSales => _orders
-      .where((o) => o.status == OrderStatus.paid)
-      .fold<int>(0, (sum, o) => sum + o.subtotal);
+  /// SALES METRICS
+  ///
+  /// Single definition, applied consistently:
+  ///  * range    — an inclusive calendar-date window (see [periodWindow]);
+  ///  * status   — `OrderStatus.paid` only;
+  ///  * method   — summed per [PaymentMethod] where a breakdown is needed;
+  ///  * timezone — local time, no UTC conversion, matching `periodWindow`.
+  ///
+  /// Every `today...` getter below delegates to [getPaidOrdersForPeriod] with
+  /// [ReportPeriod.today], so the dashboard, the sales screen and the period
+  /// reports can never disagree about the same range. Previously these getters
+  /// filtered on status only, which made a card and the chart beside it show
+  /// different numbers whenever a paid order fell on an earlier date.
+  int get todaySalesTotal => getSalesTotalForPeriod(ReportPeriod.today);
 
-  int get todayTaxTotal => _orders
-      .where((o) => o.status == OrderStatus.paid)
-      .fold<int>(0, (sum, o) => sum + o.tax);
+  int get todayGrossSales {
+    final orders = getPaidOrdersForPeriod(ReportPeriod.today);
+    return orders.fold<int>(0, (sum, o) => sum + o.subtotal);
+  }
 
-  int get todayServiceTotal => _orders
-      .where((o) => o.status == OrderStatus.paid)
-      .fold<int>(0, (sum, o) => sum + o.serviceCharge);
+  int get todayTaxTotal {
+    final orders = getPaidOrdersForPeriod(ReportPeriod.today);
+    return orders.fold<int>(0, (sum, o) => sum + o.tax);
+  }
+
+  int get todayServiceTotal {
+    final orders = getPaidOrdersForPeriod(ReportPeriod.today);
+    return orders.fold<int>(0, (sum, o) => sum + o.serviceCharge);
+  }
 
   int get todayNetSales => todayGrossSales;
 
-  int get todayTransactionsCount => _orders
-      .where((o) => o.status == OrderStatus.paid)
-      .length;
+  int get todayTransactionsCount =>
+      getTransactionsCountForPeriod(ReportPeriod.today);
 
   int get todayAverageTransactionValue => todayTransactionsCount > 0
       ? (todaySalesTotal / todayTransactionsCount).round()
       : 0;
 
-  int get todayTotalItemsSold {
-    int total = 0;
-    for (final order in _orders) {
-      if (order.status == OrderStatus.paid) {
-        for (final item in order.items) {
-          total += item.quantity;
-        }
-      }
-    }
-    return total;
-  }
+  int get todayTotalItemsSold =>
+      getTotalItemsSoldForPeriod(ReportPeriod.today);
 
-  int get todayCashSales => _orders
-      .where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.cash)
-      .fold<int>(0, (sum, o) => sum + o.grandTotal);
+  int get todayCashSales => getCashSalesForPeriod(ReportPeriod.today);
 
-  int get todayQrisSales => _orders
-      .where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.qris)
-      .fold<int>(0, (sum, o) => sum + o.grandTotal);
+  int get todayQrisSales => getQrisSalesForPeriod(ReportPeriod.today);
 
-  int get todayDebitSales => _orders
-      .where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.debitCard)
-      .fold<int>(0, (sum, o) => sum + o.grandTotal);
+  int get todayDebitSales => getDebitSalesForPeriod(ReportPeriod.today);
 
 
-  Map<String, int> get productSalesCounts {
-    final map = <String, int>{};
-    for (final order in _orders) {
-      if (order.status == OrderStatus.paid) {
-        for (final item in order.items) {
-          map[item.product.name] = (map[item.product.name] ?? 0) + item.quantity;
-        }
-      }
-    }
-    return map;
-  }
+  Map<String, int> get productSalesCounts =>
+      getProductSalesCountsForPeriod(ReportPeriod.today);
 
   List<MapEntry<String, int>> get topSellingProducts {
     final counts = productSalesCounts.entries.toList();
@@ -1450,6 +1635,80 @@ class PosProvider extends ChangeNotifier {
     return sorted.take(3).toList();
   }
 
+  // ==========================================
+  // SHIFT-SCOPED RECONCILIATION
+  // ==========================================
+
+  /// Every paid order that belongs to [shiftId].
+  ///
+  /// Membership is decided by [Order.shiftId] alone — never by timestamp. A
+  /// shift may cross midnight, and a second shift may open on the same calendar
+  /// day, so a date window cannot separate them.
+  ///
+  /// Orders whose `shiftId` is null are NOT included: they are unknown-origin
+  /// and are deliberately left out of every drawer total rather than being
+  /// silently attributed to whichever shift happens to be open.
+  List<Order> getPaidOrdersForShift(String shiftId) {
+    return _orderRepository.paidOrdersForShift(shiftId);
+  }
+
+  /// Cash actually taken during [shiftId]. This is the only figure that belongs
+  /// in a drawer reconciliation: QRIS, debit and any non-cash tender never enter
+  /// the physical till.
+  int cashSalesForShift(String shiftId) {
+    return _sumGrandTotals(
+      _orderRepository.paidOrdersForShiftAndMethod(shiftId, PaymentMethod.cash),
+    );
+  }
+
+  int qrisSalesForShift(String shiftId) {
+    return _sumGrandTotals(
+      _orderRepository.paidOrdersForShiftAndMethod(shiftId, PaymentMethod.qris),
+    );
+  }
+
+  int debitSalesForShift(String shiftId) {
+    return _sumGrandTotals(
+      _orderRepository.paidOrdersForShiftAndMethod(
+          shiftId, PaymentMethod.debitCard),
+    );
+  }
+
+  int totalSalesForShift(String shiftId) {
+    return _sumGrandTotals(getPaidOrdersForShift(shiftId));
+  }
+
+  int transactionCountForShift(String shiftId) {
+    return getPaidOrdersForShift(shiftId).length;
+  }
+
+  /// Sums grand totals, the single definition of "what this set of orders is
+  /// worth" shared by every report figure.
+  static int _sumGrandTotals(Iterable<Order> orders) {
+    return orders.fold<int>(0, (sum, o) => sum + o.grandTotal);
+  }
+
+  /// Cash that should physically be in the drawer when [shift] closes:
+  /// the opening float plus the cash taken during that shift alone.
+  int expectedEndingCashForShift(ShiftInfo shift) {
+    return shift.startingCash + cashSalesForShift(shift.shiftId);
+  }
+
+  /// Paid cash orders with no shift attribution.
+  ///
+  /// Exposed so the UI can state plainly how much cash is being left out of the
+  /// reconciliation instead of quietly dropping it.
+  List<Order> get unattributedPaidCashOrders =>
+      _orderRepository.unattributedPaidCashOrders;
+
+  /// Total cash excluded from every shift reconciliation because its origin is
+  /// unknown. Should be zero for a healthy session.
+  int get unattributedCashTotal {
+    return unattributedPaidCashOrders
+        .fold<int>(0, (sum, o) => sum + o.grandTotal);
+  }
+
+  // ==========================================
   // PERIOD-BASED FILTERING
   // ==========================================
 
@@ -1483,14 +1742,7 @@ class PosProvider extends ChangeNotifier {
   }
 
   List<Order> _getOrdersInPeriod(DateTime start, DateTime end) {
-    return _orders.where((o) {
-      final orderDate = DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
-      final startDate = DateTime(start.year, start.month, start.day);
-      final endDate = DateTime(end.year, end.month, end.day);
-      return orderDate.isAtSameMomentAs(startDate) ||
-          (orderDate.isAfter(startDate) && orderDate.isBefore(endDate)) ||
-          orderDate.isAtSameMomentAs(endDate);
-    }).toList();
+    return _orderRepository.ordersInDateRange(start, end);
   }
 
   List<Order> getOrdersForPeriod(ReportPeriod period) {
@@ -1498,15 +1750,21 @@ class PosProvider extends ChangeNotifier {
     return _getOrdersInPeriod(window.start, window.end);
   }
 
-  int getSalesTotalForPeriod(ReportPeriod period) {
-    final orders = getOrdersForPeriod(period);
-    return orders.where((o) => o.status == OrderStatus.paid).fold<int>(0, (sum, o) => sum + o.grandTotal);
+  /// Paid orders whose calendar date falls inside [period]'s window.
+  ///
+  /// Single source for "which orders count in a report": status and date range
+  /// are applied together by the repository, so no report getter can re-state
+  /// (or mistype) the paid rule.
+  List<Order> getPaidOrdersForPeriod(ReportPeriod period) {
+    final window = periodWindow(period, DateTime.now());
+    return _orderRepository.paidOrdersInDateRange(window.start, window.end);
   }
 
-  int getTransactionsCountForPeriod(ReportPeriod period) {
-    final orders = getOrdersForPeriod(period);
-    return orders.where((o) => o.status == OrderStatus.paid).length;
-  }
+  int getSalesTotalForPeriod(ReportPeriod period) =>
+      _sumGrandTotals(getPaidOrdersForPeriod(period));
+
+  int getTransactionsCountForPeriod(ReportPeriod period) =>
+      getPaidOrdersForPeriod(period).length;
 
   int getAverageTransactionForPeriod(ReportPeriod period) {
     final count = getTransactionsCountForPeriod(period);
@@ -1515,26 +1773,20 @@ class PosProvider extends ChangeNotifier {
   }
 
   int getTotalItemsSoldForPeriod(ReportPeriod period) {
-    final orders = getOrdersForPeriod(period);
-    int total = 0;
-    for (final order in orders) {
-      if (order.status == OrderStatus.paid) {
-        for (final item in order.items) {
-          total += item.quantity;
-        }
+    var total = 0;
+    for (final order in getPaidOrdersForPeriod(period)) {
+      for (final item in order.items) {
+        total += item.quantity;
       }
     }
     return total;
   }
 
   Map<String, int> getProductSalesCountsForPeriod(ReportPeriod period) {
-    final orders = getOrdersForPeriod(period);
     final map = <String, int>{};
-    for (final order in orders) {
-      if (order.status == OrderStatus.paid) {
-        for (final item in order.items) {
-          map[item.product.name] = (map[item.product.name] ?? 0) + item.quantity;
-        }
+    for (final order in getPaidOrdersForPeriod(period)) {
+      for (final item in order.items) {
+        map[item.product.name] = (map[item.product.name] ?? 0) + item.quantity;
       }
     }
     return map;
@@ -1546,27 +1798,23 @@ class PosProvider extends ChangeNotifier {
     return counts;
   }
 
-  int getCashSalesForPeriod(ReportPeriod period) {
-    final orders = getOrdersForPeriod(period);
-    return orders.where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.cash)
-        .fold<int>(0, (sum, o) => sum + o.grandTotal);
-  }
+  int getCashSalesForPeriod(ReportPeriod period) =>
+      _sumGrandTotals(_paidOrdersForPeriodAndMethod(
+          period, PaymentMethod.cash));
 
-  int getQrisSalesForPeriod(ReportPeriod period) {
-    final orders = getOrdersForPeriod(period);
-    return orders.where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.qris)
-        .fold<int>(0, (sum, o) => sum + o.grandTotal);
-  }
+  int getQrisSalesForPeriod(ReportPeriod period) =>
+      _sumGrandTotals(_paidOrdersForPeriodAndMethod(
+          period, PaymentMethod.qris));
 
-  int getDebitSalesForPeriod(ReportPeriod period) {
-    final orders = getOrdersForPeriod(period);
-    return orders.where((o) => o.status == OrderStatus.paid && o.paymentMethod == PaymentMethod.debitCard)
-        .fold<int>(0, (sum, o) => sum + o.grandTotal);
-  }
+  int getDebitSalesForPeriod(ReportPeriod period) =>
+      _sumGrandTotals(_paidOrdersForPeriodAndMethod(
+          period, PaymentMethod.debitCard));
 
-  List<Order> getPaidOrdersForPeriod(ReportPeriod period) {
-    final orders = getOrdersForPeriod(period);
-    return orders.where((o) => o.status == OrderStatus.paid).toList();
+  List<Order> _paidOrdersForPeriodAndMethod(
+      ReportPeriod period, PaymentMethod method) {
+    return getPaidOrdersForPeriod(period)
+        .where((o) => o.paymentMethod == method)
+        .toList();
   }
 }
 

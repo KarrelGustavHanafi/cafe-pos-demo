@@ -62,6 +62,34 @@ class InvalidPaymentException extends PosSaleBlockedException {
   const InvalidPaymentException(super.message);
 }
 
+/// Raised when an order prepared under one shift is submitted for payment while
+/// a different shift is open.
+///
+/// The order carries the shift it was prepared under, so settling it after that
+/// shift closed would post the sale into a closed drawer and skew its
+/// reconciliation. The sale is refused outright rather than silently reassigned:
+/// moving the order to the new shift would fabricate a sale history that never
+/// happened under that cashier.
+///
+/// Thrown before any mutation, so stock, cart and sales history are untouched
+/// and the cashier may simply prepare the order again under the open shift.
+class StaleShiftOrderException extends PosSaleBlockedException {
+  /// The shift the order was prepared under.
+  final String preparedUnderShiftId;
+
+  /// The shift that is actually open when payment was attempted.
+  final String activeShiftId;
+
+  const StaleShiftOrderException({
+    required this.preparedUnderShiftId,
+    required this.activeShiftId,
+  }) : super(
+          'Pesanan ini disiapkan pada shift $preparedUnderShiftId, '
+          'tetapi shift $activeShiftId sedang aktif. Batalkan pesanan lalu '
+          'siapkan ulang di shift yang sedang berjalan.',
+        );
+}
+
 /// Default message used when a sale is blocked by the closed-shift guard.
 const String shiftClosedSaleMessage =
     'Shift kasir sudah ditutup. Buka shift baru sebelum memproses penjualan.';

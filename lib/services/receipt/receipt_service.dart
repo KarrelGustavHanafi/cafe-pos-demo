@@ -64,9 +64,23 @@ class ReceiptService {
     return _printerService.printReceipt(receipt);
   }
 
-  Future<PrinterResult> reprintReceipt(String orderNumber) async {
+  /// Reprints a previously printed receipt, located by [orderId].
+  ///
+  /// Takes the stable `Order.id`, NOT the display order number: two distinct
+  /// sales can share an `orderNumber` (a rejected stale-shift order is
+  /// re-prepared without advancing the sequence), and matching on it would
+  /// return whichever of them happened to be printed first — silently reprinting
+  /// the wrong customer's receipt.
+  ///
+  /// Fallback to the most recent receipt is preserved for the case where the
+  /// requested receipt is not in the retained history window.
+  ///
+  /// NOTE: this feature is not currently reachable from the UI. The contract is
+  /// fixed here anyway so that wiring it up later cannot reintroduce a
+  /// display-number lookup.
+  Future<PrinterResult> reprintReceipt(String orderId) async {
     final found = _receiptHistory.firstWhere(
-      (r) => r.orderNumber == orderNumber,
+      (r) => r.orderId == orderId,
       orElse: () => _lastReceipt ?? (throw StateError('Struk tidak ditemukan untuk dicetak ulang.')),
     );
     return _printerService.printReceipt(found);

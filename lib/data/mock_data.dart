@@ -519,10 +519,23 @@ class MockData {
   }
 
 
+  /// Identifier of the demo's currently-open cashier shift.
+  ///
+  /// SEED ATTRIBUTION POLICY: the demo's sample orders are authored data, not
+  /// real history, so they are attributed to [seedActiveShiftId] explicitly in
+  /// source. That keeps the demo's opening drawer figure meaningful and keeps
+  /// the shift id and its orders from drifting apart.
+  ///
+  /// This is deliberately NOT done at runtime. `PosProvider` never backfills a
+  /// missing `shiftId` onto an existing order — an order whose shift is unknown
+  /// stays unknown and is excluded from every drawer total (see
+  /// `PosProvider.unattributedPaidCashOrders`).
+  static const String seedActiveShiftId = 'SHIFT-01';
+
   static ShiftInfo getInitialShift() {
     final now = DateTime.now();
     return ShiftInfo(
-      shiftId: 'SHIFT-01',
+      shiftId: seedActiveShiftId,
       shiftName: 'Shift Pagi (08:00 - 16:00)',
       cashierName: 'Siti Rahma (Kasir)',
       startTime: DateTime(now.year, now.month, now.day, 8, 0),
@@ -578,6 +591,9 @@ class MockData {
       status: OrderStatus.paid,
       paidAmount: 35650,
       createdAt: now.subtract(const Duration(hours: 3, minutes: 15)),
+      // Seed attribution policy: authored demo data, explicitly bound to the
+      // demo's open shift. See MockData.seedActiveShiftId.
+      shiftId: seedActiveShiftId,
       taxRate: 0.10,
       serviceChargeRate: 0.05,
       isTaxEnabled: true,
@@ -601,6 +617,7 @@ class MockData {
       paidAmount: 100000,
       changeAmount: 21800,
       createdAt: now.subtract(const Duration(hours: 1, minutes: 45)),
+      shiftId: seedActiveShiftId,
       taxRate: 0.10,
       serviceChargeRate: 0.05,
       isTaxEnabled: true,
@@ -624,6 +641,7 @@ class MockData {
       paidAmount: 81650,
       changeAmount: 0,
       createdAt: now.subtract(const Duration(minutes: 40)),
+      shiftId: seedActiveShiftId,
       taxRate: 0.10,
       serviceChargeRate: 0.05,
       isTaxEnabled: true,
