@@ -7,6 +7,7 @@ import 'package:cafe_pos_demo/models/product.dart';
 import 'package:cafe_pos_demo/screens/owner/owner_orders_screen.dart';
 import 'package:cafe_pos_demo/state/pos_provider.dart';
 import 'package:cafe_pos_demo/theme/app_theme.dart';
+import 'package:cafe_pos_demo/utils/jakarta_time.dart';
 
 /// Regression tests for the canonical period windows.
 ///
@@ -26,6 +27,22 @@ void main() {
 
   /// Fixed reference date so window maths never depends on the real clock.
   final reference = DateTime(2026, 10, 10);
+
+  /// The UTC instant for [hour]:00 WIB on the Jakarta calendar date [day].
+  ///
+  /// Orders are built as real instants; report buckets are Jakarta dates. Making
+  /// the intended WIB wall-clock time explicit keeps these tests independent of
+  /// the machine's own timezone.
+  DateTime wib(DateTime day, int hour) =>
+      DateTime.utc(day.year, day.month, day.day, hour).subtract(jakartaOffset);
+
+  /// The Jakarta date [daysAgo] days before [today], computed on UTC so no
+  /// device daylight-saving transition can move it by an hour.
+  DateTime dayBefore(DateTime today, int daysAgo) {
+    final base =
+        DateTime.utc(today.year, today.month, today.day).subtract(Duration(days: daysAgo));
+    return DateTime(base.year, base.month, base.day);
+  }
 
   // ==========================================
   // A. Pure window helper
@@ -138,13 +155,11 @@ void main() {
     late DateTime today;
 
     setUp(() {
-      final now = DateTime.now();
-      today = DateTime(now.year, now.month, now.day);
+      today = jakartaDate(DateTime.now());
     });
 
     test('each period includes exactly its own orders', () {
-      DateTime at(int daysAgo, int hour) =>
-          today.subtract(Duration(days: daysAgo, hours: -hour));
+      DateTime at(int daysAgo, int hour) => wib(dayBefore(today, daysAgo), hour);
 
       final orders = [
         makeOrder('O1', at(0, 9), 10000),
@@ -185,7 +200,7 @@ void main() {
 
     test('injected orders fully replace the mock seed orders', () {
       final pos = PosProvider(initialOrders: [
-        makeOrder('O1', today.add(const Duration(hours: 9)), 10000),
+        makeOrder('O1', wib(today, 9), 10000),
       ]);
 
       // If the three mock orders were still present, this would be 4.
@@ -196,8 +211,7 @@ void main() {
     });
 
     test('totals and counts match the included order set', () {
-      DateTime at(int daysAgo, int hour) =>
-          today.subtract(Duration(days: daysAgo, hours: -hour));
+      DateTime at(int daysAgo, int hour) => wib(dayBefore(today, daysAgo), hour);
 
       final pos = PosProvider(initialOrders: [
         makeOrder('O1', at(0, 9), 10000),
@@ -224,8 +238,8 @@ void main() {
 
     test('a filter ignoring dates entirely would be detected', () {
       final pos = PosProvider(initialOrders: [
-        makeOrder('O1', today, 10000),
-        makeOrder('OLD', today.subtract(const Duration(days: 40)), 99000),
+        makeOrder('O1', wib(today, 12), 10000),
+        makeOrder('OLD', wib(dayBefore(today, 40), 12), 99000),
       ]);
 
       // A date-blind filter would return both and report 109000.
@@ -235,8 +249,7 @@ void main() {
     });
 
     test('payment channels and item counts follow the same window', () {
-      DateTime at(int daysAgo, int hour) =>
-          today.subtract(Duration(days: daysAgo, hours: -hour));
+      DateTime at(int daysAgo, int hour) => wib(dayBefore(today, daysAgo), hour);
 
       final pos = PosProvider(initialOrders: [
         makeOrder('O1', at(0, 9), 10000, payment: PaymentMethod.cash),
@@ -268,7 +281,7 @@ void main() {
         tax: 0,
         grandTotal: 77777,
         status: OrderStatus.pending,
-        createdAt: today,
+        createdAt: wib(today, 12),
         cashierName: 'Tester',
       );
 
@@ -287,14 +300,13 @@ void main() {
   // ==========================================
   group('OwnerOrdersScreen today-only filter', () {
     testWidgets('shows only orders dated today', (tester) async {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      final today = jakartaDate(DateTime.now());
 
       final pos = PosProvider(initialOrders: [
-        makeOrder('TODAY-EARLY', today.add(const Duration(hours: 1)), 10000),
-        makeOrder('TODAY-LATE', today.add(const Duration(hours: 22)), 20000),
-        makeOrder('YESTERDAY', today.subtract(const Duration(days: 1)), 30000),
-        makeOrder('OLD', today.subtract(const Duration(days: 40)), 40000),
+        makeOrder('TODAY-EARLY', wib(today, 1), 10000),
+        makeOrder('TODAY-LATE', wib(today, 22), 20000),
+        makeOrder('YESTERDAY', wib(dayBefore(today, 1), 12), 30000),
+        makeOrder('OLD', wib(dayBefore(today, 40), 12), 40000),
       ]);
 
       await tester.pumpWidget(

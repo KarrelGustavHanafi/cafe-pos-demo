@@ -26,6 +26,7 @@ import '../services/telegram/telegram_notification_service.dart';
 import '../services/receipt/receipt_service.dart';
 import '../repositories/order_repository.dart';
 import '../utils/cart_calculator.dart';
+import '../utils/jakarta_time.dart';
 import '../utils/recipe_calculator.dart';
 import '../utils/shift_sale_guard.dart';
 
@@ -1673,7 +1674,9 @@ class PosProvider extends ChangeNotifier {
   ///  * range    — an inclusive calendar-date window (see [periodWindow]);
   ///  * status   — `OrderStatus.paid` only;
   ///  * method   — summed per [PaymentMethod] where a breakdown is needed;
-  ///  * timezone — local time, no UTC conversion, matching `periodWindow`.
+  ///  * timezone — Asia/Jakarta (WIB), applied through `jakartaDate` so every
+  ///    surface buckets a sale on the cafe's day regardless of the device's
+  ///    timezone.
   ///
   /// Every `today...` getter below delegates to [getPaidOrdersForPeriod] with
   /// [ReportPeriod.today], so the dashboard, the sales screen and the period
@@ -1823,8 +1826,11 @@ class PosProvider extends ChangeNotifier {
   ///  * [ReportPeriod.last30Days] -> 30 calendar dates (reference minus 29)
   ///
   /// Both endpoints are inclusive. Only the calendar date matters, so a sale at
-  /// 23:59 still belongs to that day. Times are local: [reference] is expected
-  /// to already be a local time, and no UTC conversion is applied anywhere.
+  /// 23:59 still belongs to that day.
+  ///
+  /// [reference] carries the cafe's wall-clock components ([jakartaNow] in
+  /// production), and date arithmetic runs on UTC so a device timezone with
+  /// daylight saving cannot shift the window by an hour across a boundary.
   ///
   /// Taking [reference] as a parameter (rather than reading the clock here)
   /// keeps the window logic deterministic and unit-testable.
@@ -1832,14 +1838,17 @@ class PosProvider extends ChangeNotifier {
     ReportPeriod period,
     DateTime reference,
   ) {
-    final today = DateTime(reference.year, reference.month, reference.day);
+    final base = DateTime.utc(reference.year, reference.month, reference.day);
     final backDays = switch (period) {
       ReportPeriod.today => 0,
       ReportPeriod.last7Days => 6,
       ReportPeriod.last30Days => 29,
     };
-    final start = today.subtract(Duration(days: backDays));
-    return (start: start, end: today);
+    final startUtc = base.subtract(Duration(days: backDays));
+    return (
+      start: DateTime(startUtc.year, startUtc.month, startUtc.day),
+      end: DateTime(base.year, base.month, base.day),
+    );
   }
 
   List<Order> _getOrdersInPeriod(DateTime start, DateTime end) {
@@ -1847,7 +1856,7 @@ class PosProvider extends ChangeNotifier {
   }
 
   List<Order> getOrdersForPeriod(ReportPeriod period) {
-    final window = periodWindow(period, DateTime.now());
+    final window = periodWindow(period, jakartaNow());
     return _getOrdersInPeriod(window.start, window.end);
   }
 
@@ -1857,7 +1866,7 @@ class PosProvider extends ChangeNotifier {
   /// are applied together by the repository, so no report getter can re-state
   /// (or mistype) the paid rule.
   List<Order> getPaidOrdersForPeriod(ReportPeriod period) {
-    final window = periodWindow(period, DateTime.now());
+    final window = periodWindow(period, jakartaNow());
     return _orderRepository.paidOrdersInDateRange(window.start, window.end);
   }
 

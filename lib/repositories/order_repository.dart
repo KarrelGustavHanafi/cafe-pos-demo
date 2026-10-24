@@ -34,6 +34,7 @@
 library;
 
 import '../models/order.dart';
+import '../utils/jakarta_time.dart';
 
 /// Read/write access to the order collection.
 abstract class OrderRepository {
@@ -216,8 +217,9 @@ class InMemoryOrderRepository implements OrderRepository {
     final endDate = DateTime(end.year, end.month, end.day);
     return _orders.where((o) {
       if (o.status != OrderStatus.paid) return false;
-      final orderDate =
-          DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
+      // Bucket by the cafe's calendar (Asia/Jakarta), never the device's, so a
+      // sale at 23:30 WIB stays on the day the owner closed the till.
+      final orderDate = jakartaDate(o.createdAt);
       return !orderDate.isBefore(startDate) && !orderDate.isAfter(endDate);
     }).toList();
   }
@@ -227,8 +229,7 @@ class InMemoryOrderRepository implements OrderRepository {
     final startDate = DateTime(start.year, start.month, start.day);
     final endDate = DateTime(end.year, end.month, end.day);
     return _orders.where((o) {
-      final orderDate =
-          DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
+      final orderDate = jakartaDate(o.createdAt);
       return !orderDate.isBefore(startDate) && !orderDate.isAfter(endDate);
     }).toList();
   }

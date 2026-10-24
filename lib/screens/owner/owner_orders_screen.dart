@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/order.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/jakarta_time.dart';
 import '../../widgets/receipt_widget.dart';
 
 class OwnerOrdersScreen extends StatefulWidget {
@@ -81,18 +82,14 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-
-    // Reuse the canonical "today" window so this screen and the reporting
-    // screens can never disagree about which calendar date "today" means.
-    final today = PosProvider.periodWindow(ReportPeriod.today, now).start;
+    // The cafe's day, not the device's: a visitor in another timezone must see
+    // the same "today" as the reporting screens.
+    final today = jakartaDate(DateTime.now());
 
     final filteredOrders = widget.pos.orders.where((o) {
       if (_filterTodayOnly) {
         // Calendar-date comparison, matching PosProvider's period filtering.
-        final orderDate =
-            DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
-        if (!orderDate.isAtSameMomentAs(today)) return false;
+        if (!jakartaDate(o.createdAt).isAtSameMomentAs(today)) return false;
       }
       if (_methodFilter != null && o.paymentMethod != _methodFilter) return false;
       if (_statusFilter != null && o.status != _statusFilter) return false;
