@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/user.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/demo_data_notice.dart';
@@ -270,7 +269,7 @@ class _OwnerShellState extends State<OwnerShell> {
             ),
           ),
 
-          // Presenter Demo Switch & Logout Action & Contact Info
+          // Logout Action & Contact Info
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
@@ -279,21 +278,6 @@ class _OwnerShellState extends State<OwnerShell> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => widget.pos.switchUserRole(UserRole.cashier),
-                  icon: const Icon(Icons.point_of_sale_rounded, size: 15, color: AppColors.primary),
-                  label: const Text(
-                    'Buka Kasir POS (Demo)',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    minimumSize: const Size(0, 44),
-                    side: const BorderSide(color: AppColors.primaryBorder),
-                    backgroundColor: AppColors.primarySoft,
-                  ),
-                ),
-                const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: widget.onLogout,
                   icon: const Icon(Icons.logout_rounded, size: 16, color: AppColors.textSecondary),
@@ -492,26 +476,6 @@ class _OwnerShellState extends State<OwnerShell> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-                        Navigator.of(context).pop();
-                      }
-                      widget.pos.switchUserRole(UserRole.cashier);
-                    },
-                    icon: const Icon(Icons.point_of_sale_rounded, size: 15, color: AppColors.primary),
-                    label: const Text(
-                      'Buka Kasir POS (Demo)',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      minimumSize: const Size(0, 44),
-                      side: const BorderSide(color: AppColors.primaryBorder),
-                      backgroundColor: AppColors.primarySoft,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   OutlinedButton.icon(
                     onPressed: widget.onLogout,
                     icon: const Icon(Icons.logout_rounded, size: 16),

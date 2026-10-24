@@ -168,6 +168,112 @@ class PosProvider extends ChangeNotifier {
   Order? get currentOrder => _currentOrder;
 
   // ==========================================
+  // DEMO RESET
+  // ==========================================
+
+  /// Whether the signed-in Owner may run [resetDemoData].
+  ///
+  /// Fail-closed on every axis: an unauthenticated session, a Cashier and a
+  /// non-demo configuration each yield false, so the UI can neither show nor
+  /// enable the action. This getter exists for rendering convenience only — the
+  /// same conditions are re-checked inside [resetDemoData] itself, so it is
+  /// never the sole gate and cannot be bypassed by another caller.
+  bool get canResetDemoData =>
+      isAuthenticated && _currentUser!.isOwner && _businessConfig.isPublicDemo;
+
+  /// Test-only hook fired after [resetDemoData] has validated that it may run,
+  /// but before any state is cleared.
+  ///
+  /// Never set in production. Clearing the state is a run of plain field and
+  /// list mutations with no `await` and no throwing work, so this is the only
+  /// point where a reset can fail — and proving nothing was cleared when it
+  /// does is what keeps the "no partial reset" guarantee honest rather than
+  /// aspirational.
+  @visibleForTesting
+  void Function()? debugThrowBeforeResetApply;
+
+  /// Clears the demo session's operational data while preserving what the
+  /// owner has actually been doing.
+  ///
+  /// Cleared: every stored order (seeded transactions included), the cart and
+  /// the active order, the whole stock-adjustment history, the archived shift
+  /// history, the session's printed receipts, and the in-memory notification
+  /// trackers. The active shift is replaced by the pristine open demo shift, so
+  /// a sale can still be made afterwards — nothing is closed and nothing is
+  /// archived on the way.
+  ///
+  /// Preserved: current product stock and raw-material stock, exactly as they
+  /// stand; the menu, categories and recipes, including recipes the owner edited
+  /// during the session; the Owner/Cashier accounts; and the whole business
+  /// configuration — [businessConfig], the settings mirrored from it, the config
+  /// service, and the stored `caffe_business_config` key. Telegram configuration
+  /// and credentials are part of that business configuration and are untouched.
+  ///
+  /// Every sales and revenue figure reports zero afterwards as a consequence of
+  /// the cleared orders, not as a separately zeroed counter — there is no
+  /// cached total that could drift out of step.
+  ///
+  /// Stock needs no snapshot-and-restore: this method contains no assignment
+  /// to `Product.stock` or `RawMaterial.stock`, and clearing an order only
+  /// drops a reference to its `Product` without touching the product itself.
+  /// Preserving stock by never writing it is strictly safer than restoring a
+  /// captured copy, because there is no window in which a half-restored stock
+  /// value could be observed.
+  ///
+  /// Emits no notification, prints no receipt and makes no external call.
+  /// [_telegramNotificationService] is only re-seeded in memory, so a reset
+  /// cannot reach a Telegram chat or a relay webhook.
+  ///
+  /// Demo-only, Owner-only and fail-closed: it throws unless the business
+  /// config marks this as a public demo AND the signed-in user is an Owner,
+  /// because on a real installation it would destroy a day's sales, shift
+  /// history and audit trail. Both conditions are re-checked here at execution
+  /// time rather than trusted from whatever the UI happened to render.
+  ///
+  /// Idempotent, and safe against a partial reset. The apply step is one
+  /// uninterrupted synchronous sequence of field and list mutations with no
+  /// `await`, so no sale can interleave: the orders cannot be re-inserted
+  /// between clearing them and clearing the stock history they produced. That
+  /// is the same no-interleaving rule the settlement atomicity contract
+  /// depends on.
+  void resetDemoData() {
+    if (!_businessConfig.isPublicDemo) {
+      throw StateError(
+        'resetDemoData hanya boleh dipakai pada konteks demo publik.',
+      );
+    }
+    if (!canResetDemoData) {
+      throw StateError(
+        'resetDemoData hanya boleh dipakai oleh Owner yang sudah login.',
+      );
+    }
+
+    debugThrowBeforeResetApply?.call();
+
+    _orderRepository.replaceAll(const <Order>[]);
+    _stockAdjustments.clear();
+    _pastShifts.clear();
+    _currentShift = MockData.getInitialShift();
+    _currentOrder = null;
+    _cart.clear();
+    _receiptService.clearSessionReceipts();
+
+    // Notification bookkeeping only, no send: drop the trackers for orders that
+    // no longer exist, then re-seed the low-stock set from the stock that is
+    // being preserved, so a reset session cannot re-alert an item the owner has
+    // already been warned about.
+    _telegramNotificationService.resetTracking();
+    _telegramNotificationService.seedAlreadyLowStockItems([
+      ..._products
+          .where((p) => p.stock <= _businessConfig.defaultLowStockThreshold)
+          .map((p) => p.id),
+      ..._rawMaterials.where((m) => m.stock <= m.minimumStock).map((m) => m.id),
+    ]);
+
+    notifyListeners();
+  }
+
+  // ==========================================
   // SHIFT GATE (Closed-Shift Guard)
   // ==========================================
 
@@ -213,11 +319,6 @@ class PosProvider extends ChangeNotifier {
   void logout() {
     _currentUser = null;
     clearCart();
-    notifyListeners();
-  }
-
-  void switchUserRole(UserRole role) {
-    _currentUser = MockData.users.firstWhere((u) => u.role == role);
     notifyListeners();
   }
 

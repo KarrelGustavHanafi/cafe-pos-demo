@@ -46,6 +46,19 @@ class ReceiptService {
     _printerService = customPrinter;
   }
 
+  /// Drops the receipts printed during the current session.
+  ///
+  /// Used by the demo reset. [ReceiptService] keeps nothing on disk, so this
+  /// cannot touch persisted data or business configuration — it only empties
+  /// [lastReceipt] and [receiptHistory]. Afterwards the service behaves exactly
+  /// as it does before any receipt has ever been printed: [reprintLastReceipt]
+  /// reports that there is nothing to reprint, and [reprintReceipt] falls back
+  /// to its "not found" error instead of resolving to a stale sale's receipt.
+  void clearSessionReceipts() {
+    _lastReceipt = null;
+    _receiptHistory.clear();
+  }
+
   ReceiptData buildReceiptData(Order order, BusinessConfig config) {
     return ReceiptData.fromOrder(order, config);
   }

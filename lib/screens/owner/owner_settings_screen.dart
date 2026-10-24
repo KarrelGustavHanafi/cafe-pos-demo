@@ -54,6 +54,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
   bool _isTestingTelegram = false;
   bool _isTestingPrinter = false;
   bool _isTestingQris = false;
+  bool _isResettingDemoData = false;
 
   @override
   void initState() {
@@ -321,6 +322,209 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
     );
   }
 
+  // ==========================================
+  // OWNER-ONLY DEMO RESET
+  // ==========================================
+
+  /// Opens the confirmation dialog, then runs the reset only on confirmation.
+  ///
+  /// Access is re-checked twice on purpose: once when the action is requested,
+  /// and again inside [_runResetDemoData] immediately before the state is
+  /// cleared. Rendering the button is never treated as authorisation, so a
+  /// stale screen cannot perform a reset after the role or demo mode changed.
+  Future<void> _openResetDemoDataDialog() async {
+    if (!widget.pos.canResetDemoData) {
+      _showResultDialog(
+        title: 'Reset Data Demo',
+        success: false,
+        message: 'Aksi ini hanya tersedia untuk Owner pada mode demo publik. '
+            'Tidak ada data yang diubah.',
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.restart_alt_rounded, color: AppColors.danger, size: 22),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Reset Data Demo',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Tindakan ini membersihkan data operasional SESI DEMO:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '• Seluruh transaksi dan omzet demo\n'
+                '• Pesanan aktif dan keranjang kasir\n'
+                '• Riwayat shift sesi ini\n'
+                '• Riwayat penyesuaian stok\n'
+                '• Riwayat struk sesi ini',
+                style: TextStyle(fontSize: 12, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.successSoft,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.verified_rounded, color: AppColors.success, size: 15),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'TIDAK AKAN dihapus:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      '• Stok produk dan bahan baku (dipertahankan persis)\n'
+                      '• Menu, kategori, dan resep\n'
+                      '• Akun Owner & Kasir\n'
+                      '• Konfigurasi bisnis dan pengaturan aplikasi',
+                      style: TextStyle(fontSize: 12, height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Gunakan hanya untuk sesi demonstrasi, bukan untuk data operasional nyata.',
+                style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.textSecondary, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.restart_alt_rounded, size: 16),
+            label: const Text('Reset', style: TextStyle(fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Cancelling changes nothing: the reset is only reached from `true`.
+    if (confirmed != true || !mounted) return;
+    await _runResetDemoData();
+  }
+
+  Future<void> _runResetDemoData() async {
+    if (_isResettingDemoData) return;
+    setState(() => _isResettingDemoData = true);
+
+    late final bool ok;
+    late final String message;
+    try {
+      // Final authorisation check at the moment of execution.
+      if (!widget.pos.canResetDemoData) {
+        throw StateError('Aksi reset tidak diizinkan.');
+      }
+      widget.pos.resetDemoData();
+      ok = true;
+      message = 'Data operasional demo berhasil dikosongkan. '
+          'Omzet kini nol, stok produk dan bahan baku tetap dipertahankan, '
+          'dan satu shift demo terbuka untuk penjualan berikutnya.';
+    } catch (_) {
+      ok = false;
+      // The underlying error is deliberately not surfaced: it could carry
+      // configuration detail. The reset validates before it mutates, so a
+      // failure here means nothing was cleared.
+      message = 'Reset data demo gagal dan dibatalkan. Tidak ada data yang diubah.';
+    }
+
+    if (!mounted) return;
+    setState(() => _isResettingDemoData = false);
+    _showResultDialog(title: 'Reset Data Demo', success: ok, message: message);
+  }
+
+  Widget _buildDemoResetCard() {
+    return _buildSectionCard(
+      title: 'Reset Data Demo',
+      icon: Icons.restart_alt_rounded,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.infoSoft,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.science_outlined, color: AppColors.info, size: 16),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Khusus mode demo publik. Mengosongkan transaksi, omzet, keranjang, riwayat shift, penyesuaian stok, dan struk sesi. Stok, menu, resep, akun, dan konfigurasi bisnis tetap utuh.',
+                  style: TextStyle(fontSize: 11, color: AppColors.info, fontWeight: FontWeight.w600, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _isResettingDemoData ? null : _openResetDemoDataDialog,
+            icon: _isResettingDemoData
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.restart_alt_rounded, size: 16),
+            label: Text(
+              _isResettingDemoData ? 'Mengosongkan Data...' : 'Reset Data Demo',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.danger,
+              side: BorderSide(color: AppColors.danger.withValues(alpha: 0.5)),
+              minimumSize: const Size(0, 44),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showResultDialog({required String title, required bool success, required String message}) {
     showDialog(
       context: context,
@@ -582,6 +786,12 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
                   ),
                 ],
               ),
+              // Owner-only, public-demo-only control. Hidden outright rather than
+              // shown disabled, so the action is unreachable in any other mode.
+              if (widget.pos.canResetDemoData) ...[
+                const SizedBox(height: 16),
+                _buildDemoResetCard(),
+              ],
             ],
           ),
         ),
