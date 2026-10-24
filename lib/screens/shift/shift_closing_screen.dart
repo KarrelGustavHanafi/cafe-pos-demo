@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/business_config.dart';
+import '../../services/telegram/telegram_service.dart';
 import '../../state/pos_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -171,6 +172,49 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
     _actualCashController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  /// Telegram half of the post-close status, kept deliberately separate from
+  /// the close itself.
+  ///
+  /// [result] is null both when the integration is configured but nothing was
+  /// sent (already reported, or the dispatcher swallowed an error) and when it
+  /// is disabled, so the configuration flag - never the null - decides what is
+  /// reported. The distinction matters: a failed request must not be presented
+  /// as "Telegram is not active", and neither must imply the close failed.
+  ({String? title, String message}) _telegramOutcome({
+    required TelegramConfig config,
+    required TelegramSendResult? result,
+    required bool simulated,
+    required bool isPublicDemo,
+  }) {
+    if (!config.enabled) {
+      return (
+        title: isPublicDemo ? 'Notifikasi Telegram (Demo)' : 'Notifikasi Telegram',
+        message: isPublicDemo
+            ? 'Pengiriman notifikasi Telegram belum diaktifkan pada demo ini.'
+            : 'Pengiriman notifikasi Telegram belum diaktifkan.',
+      );
+    }
+    if (result == null) {
+      return (
+        title: null,
+        message:
+            'Notifikasi Telegram tidak terkirim untuk shift ini. Penutupan shift tetap berhasil.',
+      );
+    }
+    if (!result.success) {
+      return (
+        title: null,
+        message: 'Notifikasi Telegram gagal dikirim. Penutupan shift tetap berhasil.',
+      );
+    }
+    return (
+      title: null,
+      message: simulated
+          ? 'Laporan shift disimulasikan (Mock Telegram).'
+          : 'Laporan berhasil dikirim ke Telegram.',
+    );
   }
 
   @override
@@ -459,28 +503,40 @@ class _ShiftClosingScreenState extends State<ShiftClosingScreen> {
                                 (widget.pos.businessConfig.isPublicDemo &&
                                     telegramConfig.integrationMode == TelegramIntegrationMode.directBotApi);
 
-                            String feedbackText;
-                            Color feedbackColor = AppColors.primaryDark;
-
-                            if (!telegramConfig.enabled) {
-                              feedbackText = 'Shift berhasil ditutup.';
-                            } else if (result != null && result.success) {
-                              if (isSimulated) {
-                                feedbackText = 'Shift berhasil ditutup. Laporan shift disimulasikan (Mock Telegram).';
-                              } else {
-                                feedbackText = 'Shift berhasil ditutup. Laporan berhasil dikirim ke Telegram.';
-                              }
-                            } else if (result != null && !result.success) {
-                              feedbackText = 'Shift berhasil ditutup, tetapi notifikasi Telegram gagal: ${result.message}';
-                              feedbackColor = AppColors.warning;
-                            } else {
-                              feedbackText = 'Shift berhasil ditutup.';
-                            }
+                            // The shift is already closed and archived above, so the
+                            // Telegram outcome is a separate line. It must never
+                            // read as "the close failed", and it must never claim
+                            // Telegram is inactive just because a send failed.
+                            final telegram = _telegramOutcome(
+                              config: telegramConfig,
+                              result: result,
+                              simulated: isSimulated,
+                              isPublicDemo: widget.pos.businessConfig.isPublicDemo,
+                            );
 
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(feedbackText),
-                                backgroundColor: feedbackColor,
+                                duration: const Duration(seconds: 6),
+                                backgroundColor: AppColors.primaryDark,
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Shift berhasil ditutup',
+                                      style: TextStyle(fontWeight: FontWeight.w700),
+                                    ),
+                                    if (telegram.title != null) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        telegram.title!,
+                                        style: const TextStyle(fontWeight: FontWeight.w700),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 2),
+                                    Text(telegram.message),
+                                  ],
+                                ),
                               ),
                             );
                           },
