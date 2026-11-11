@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:cafe_pos_demo/data/mock_data.dart';
 import 'package:cafe_pos_demo/models/modifier.dart';
 import 'package:cafe_pos_demo/models/order.dart';
 import 'package:cafe_pos_demo/models/product.dart';
@@ -750,7 +751,13 @@ void main() {
       expect(paid.status, OrderStatus.paid);
       expect(paid.grandTotal, 60950);
       expect(pos.cart, isEmpty);
-      expect(pos.products.firstWhere((p) => p.id == 'PRD-001').stock, 38 - 2);
+      final baseline =
+          MockData.getInitialProducts().firstWhere((p) => p.id == 'PRD-001').stock;
+      expect(
+        pos.products.firstWhere((p) => p.id == 'PRD-001').stock,
+        baseline - 2,
+        reason: 'two units sold off the menu baseline',
+      );
     });
   });
 }

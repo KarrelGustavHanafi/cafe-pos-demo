@@ -241,11 +241,19 @@ void main() {
       final pos = await newProvider();
       final shiftA = pos.currentShift.shiftId;
 
-      // A cash sale in shift A. The seeded demo orders also belong to shift A,
-      // so expectations are the shift's own aggregates, not this single sale.
+      // A cash sale in shift A, plus a QRIS sale so non-cash tender has to be
+      // excluded from the drawer expectation.
       pos.addToCart(inStockProduct(pos));
       pos.prepareCheckoutOrder();
       payCash(pos);
+
+      pos.addToCart(inStockProduct(pos));
+      pos.prepareCheckoutOrder();
+      pos.completePayment(
+        method: PaymentMethod.qris,
+        paidAmount: pos.cartGrandTotal,
+        changeAmount: 0,
+      );
 
       final expectedTotal = pos.totalSalesForShift(shiftA);
       final expectedCash = pos.cashSalesForShift(shiftA);
@@ -285,6 +293,15 @@ void main() {
       pos.addToCart(inStockProduct(pos));
       pos.prepareCheckoutOrder();
       final orderA = payCash(pos);
+      // Non-cash tender in shift A, so a shift-B report that inherited shift A
+      // would be visibly larger than shift B's own single cash sale.
+      pos.addToCart(inStockProduct(pos));
+      pos.prepareCheckoutOrder();
+      pos.completePayment(
+        method: PaymentMethod.qris,
+        paidAmount: pos.cartGrandTotal,
+        changeAmount: 0,
+      );
       await pos.closeShift(actualEndingCash: 0);
 
       pos.startNewShift(startingCash: 500000);

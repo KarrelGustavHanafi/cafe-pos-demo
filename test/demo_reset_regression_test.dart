@@ -12,9 +12,11 @@ import 'package:cafe_pos_demo/services/storage/local_app_storage.dart';
 import 'package:cafe_pos_demo/services/telegram/mock_telegram_service.dart';
 import 'package:cafe_pos_demo/state/pos_provider.dart';
 
-/// Proves [PosProvider.resetDemoData] clears every operational collection of the
-/// demo session while leaving stock, catalogue and business configuration
-/// exactly as the owner left them, and never reaches an external service.
+/// Proves [PosProvider.resetDemoData] returns the demo session to the state a
+/// freshly opened tab starts in - no transactions, no shift history, no stock
+/// adjustment history, and stock back at the catalogue baseline - while leaving
+/// the catalogue and business configuration alone and never calling out to an
+/// external service.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -74,11 +76,19 @@ void main() {
         materials: pos.rawMaterials.map((m) => m.stock).toList(),
       );
 
+  List<int> productBaseline() =>
+      MockData.getInitialProducts().map((p) => p.stock).toList();
+  List<double> materialBaseline() =>
+      MockData.getInitialRawMaterials().map((m) => m.stock).toList();
+
   group('Demo reset — clearing operational data', () {
-    test('1. Orders are emptied, including the seeded transactions', () async {
+    test('1. Orders are emptied', () async {
       final pos = await buildProvider();
-      expect(pos.orders, isNotEmpty, reason: 'seed orders must exist first');
-      expect(pos.paidOrders, hasLength(3));
+      expect(pos.orders, isEmpty,
+          reason: 'a fresh demo opens with no transactions');
+
+      runSale(pos);
+      expect(pos.paidOrders, hasLength(1));
 
       pos.resetDemoData();
 
@@ -89,6 +99,7 @@ void main() {
 
     test('2. Every sales and revenue report reads zero', () async {
       final pos = await buildProvider();
+      runSale(pos);
       expect(pos.todaySalesTotal, greaterThan(0));
 
       pos.resetDemoData();
@@ -129,37 +140,33 @@ void main() {
     });
   });
 
-  group('Demo reset — stock is preserved, not re-seeded', () {
-    test('4. Product and raw-material stock are unchanged by the reset',
+  group('Demo reset - stock returns to the demo baseline', () {
+    test('4. Product and raw-material stock are restored to the baseline',
         () async {
       final pos = await buildProvider();
 
-      // Move both stocks away from seed first, so a reset that quietly
-      // re-seeded them could not pass by accident.
+      // Move both stocks away from baseline first, so a reset that quietly did
+      // nothing could not pass by accident.
       runSale(pos);
-      final before = snapshotStock(pos);
-      expect(before.products, isNot(MockData.getInitialProducts()
-          .map((p) => p.stock)
-          .toList()),
+      final afterSale = snapshotStock(pos);
+      expect(afterSale.products, isNot(productBaseline()),
           reason: 'the sale must actually move product stock');
-      expect(before.materials, isNot(MockData.getInitialRawMaterials()
-          .map((m) => m.stock)
-          .toList()),
+      expect(afterSale.materials, isNot(materialBaseline()),
           reason: 'the sale must actually move raw-material stock');
 
       pos.resetDemoData();
 
-      expect(snapshotStock(pos).products, before.products,
-          reason: 'product stock must survive the reset untouched');
-      expect(snapshotStock(pos).materials, before.materials,
-          reason: 'raw-material stock must survive the reset untouched');
+      expect(snapshotStock(pos).products, productBaseline(),
+          reason: 'product stock must return to the demo baseline');
+      expect(snapshotStock(pos).materials, materialBaseline(),
+          reason: 'raw-material stock must return to the demo baseline');
       expect(
         pos.rawMaterials.firstWhere((m) => m.name == 'Coffee Beans').stock,
-        before.materials.first,
+        MockData.getInitialRawMaterials().first.stock,
       );
     });
 
-    test('5. Owner stock adjustments survive the reset as stock, but leave no history',
+    test('5. Owner stock adjustments are undone, leaving no history',
         () async {
       final pos = await buildProvider();
       pos.login('owner', 'owner123');
@@ -177,20 +184,13 @@ void main() {
         quantity: 250,
         reason: 'bahan bocor',
       );
-      expect(pos.stockAdjustments.length, 5);
-
-      final before = snapshotStock(pos);
+      expect(pos.stockAdjustments.length, 2,
+          reason: 'the two session adjustments, nothing seeded');
 
       pos.resetDemoData();
 
-      expect(snapshotStock(pos).products, before.products);
-      expect(snapshotStock(pos).materials, before.materials);
-      expect(pos.products.firstWhere((p) => p.id == target.id).stock,
-          before.products.first);
-      expect(
-        pos.rawMaterials.firstWhere((m) => m.id == beans.id).stock,
-        before.materials.first,
-      );
+      expect(pos.products.map((p) => p.stock).toList(), productBaseline());
+      expect(pos.rawMaterials.map((m) => m.stock).toList(), materialBaseline());
       expect(pos.stockAdjustments, isEmpty,
           reason: 'the audit history is session data and must be cleared');
     });
@@ -360,18 +360,29 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
       pos.setTelegramService(MockTelegramService());
       pos.login('owner', 'owner123');
+      pos.debugSeedOrderForTest(
+        paymentMethod: PaymentMethod.cash,
+        grandTotal: 1000,
+        createdAt: DateTime.now(),
+        shiftId: pos.currentShift.shiftId,
+      );
       expect(pos.canResetDemoData, isFalse);
       expect(pos.orders, isNotEmpty);
 
       expect(pos.resetDemoData, throwsStateError);
       expect(pos.orders, isNotEmpty, reason: 'a refused reset must change nothing');
-      expect(pos.stockAdjustments, isNotEmpty);
     });
 
     test('12b. Reset is refused for a Cashier or an anonymous session',
         () async {
       final pos = await buildProvider();
       expect(pos.canResetDemoData, isTrue);
+      pos.debugSeedOrderForTest(
+        paymentMethod: PaymentMethod.cash,
+        grandTotal: 1000,
+        createdAt: DateTime.now(),
+        shiftId: pos.currentShift.shiftId,
+      );
 
       pos.login('cashier', 'cashier123');
       expect(pos.canResetDemoData, isFalse);
@@ -382,7 +393,6 @@ void main() {
       expect(pos.resetDemoData, throwsStateError);
 
       expect(pos.orders, isNotEmpty, reason: 'nothing may be cleared');
-      expect(pos.stockAdjustments, isNotEmpty);
     });
   });
 

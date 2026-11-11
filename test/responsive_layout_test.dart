@@ -75,6 +75,15 @@ Future<List<String>> collectOverflows(
 
   final pos = PosProvider()..login('owner', 'owner123');
   pos.loadDemoQuickOrder();
+  // A fresh demo has no transactions, but the receipt widget renders a
+  // completed sale, so settle one here.
+  pos.prepareCheckoutOrder();
+  final order = pos.currentOrder!;
+  pos.completePayment(
+    method: order.paymentMethod,
+    paidAmount: order.grandTotal,
+    changeAmount: 0,
+  );
 
   try {
     await tester.pumpWidget(

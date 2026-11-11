@@ -51,24 +51,40 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
+  /// Settles one real sale, so a period figure has an order behind it. A fresh
+  /// demo opens with no transactions at all.
+  void sellOne(PosProvider pos) {
+    pos.login('cashier', 'cashier123');
+    pos.addToCart(pos.activeProducts.firstWhere((p) => p.stock > 0));
+    pos.prepareCheckoutOrder();
+    final order = pos.currentOrder!;
+    pos.completePayment(
+      method: order.paymentMethod,
+      paidAmount: order.grandTotal,
+      changeAmount: 0,
+    );
+  }
+
   group('F-1: sales periods derive from real orders, never a multiplier', () {
     test('period totals equal the sum of the orders that actually exist', () {
       final pos = PosProvider();
+      sellOne(pos);
 
-      // The seed orders are all created today, so every period that includes
-      // today must agree with the today's-period query. If a multiplier were
-      // still applied, the 7-day figure would be ~6.8x larger and fail here.
+      // The sale is created today, so every period that includes today must
+      // agree with the today's-period query. If a multiplier were still
+      // applied, the 7-day figure would be ~6.8x larger and fail here.
       final today = pos.getSalesTotalForPeriod(ReportPeriod.today);
       final week = pos.getSalesTotalForPeriod(ReportPeriod.last7Days);
       final month = pos.getSalesTotalForPeriod(ReportPeriod.last30Days);
 
-      expect(today, greaterThan(0), reason: 'seed data should produce sales');
+      expect(today, greaterThan(0), reason: 'the sale should produce sales');
       expect(week, today);
       expect(month, today);
     });
 
     test('period transaction and item counts are consistent with each other', () {
       final pos = PosProvider();
+      sellOne(pos);
       final period = ReportPeriod.last7Days;
 
       final sales = pos.getSalesTotalForPeriod(period);
@@ -155,22 +171,22 @@ void main() {
       expect(find.text(AppCurrency.format(pos.todayCashSales)), findsWidgets);
     });
 
-    testWidgets('closed shift variance is never presented as a real amount',
+    testWidgets('closed shift variance is derived from recorded cash only',
         (tester) async {
       final pos = PosProvider();
+      final startingCash = pos.currentShift.startingCash;
+      final cashSales = pos.cashSalesForShift(pos.currentShift.shiftId);
       // Close with a deliberately large, known overage.
-      await pos.closeShift(
-          actualEndingCash: pos.currentShift.startingCash + 500000);
+      await pos.closeShift(actualEndingCash: startingCash + 500000);
       await pumpOwnerScreen(tester, OwnerShiftsScreen(pos: pos), pos);
 
-      // A real ending cash is shown, but the variance must stay unavailable
-      // because expected cash depends on the underivable shift sales.
       expect(find.textContaining('Tidak tersedia'), findsWidgets);
       expect(find.textContaining('Selisih Kas'), findsWidgets);
 
-      // The known 500000 overage must never surface as a variance amount,
-      // since the expected side of that subtraction is not knowable.
-      expect(find.textContaining('Rp500.000'), findsNothing);
+      // The only variance on screen is the one this close recorded: actual cash
+      // minus (float + real cash sales). No hardcoded figure, no multiplier.
+      final variance = startingCash + 500000 - (startingCash + cashSales);
+      expect(find.text(AppCurrency.format(variance)), findsWidgets);
     });
 
     testWidgets('open shift shows an active-state label, not missing data',

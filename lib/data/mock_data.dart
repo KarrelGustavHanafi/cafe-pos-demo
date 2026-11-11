@@ -1,9 +1,6 @@
 import '../models/user.dart';
 import '../models/product.dart';
-import '../models/cart_item.dart';
-import '../models/order.dart';
 import '../models/shift.dart';
-import '../models/stock_adjustment.dart';
 import '../models/raw_material.dart';
 import '../models/recipe.dart';
 import '../models/modifier.dart';
@@ -418,7 +415,7 @@ class MockData {
         price: 18000,
         costPrice: 7500,
         category: ProductCategory.coffee,
-        stock: 38,
+        stock: 45,
         lowStockThreshold: 15,
         description: 'Espresso blend pilihan dengan susu segar dingin dan sirup aren organik khas Caffe',
         imageUrl: presetPhotography['Kopi Susu Gula Aren']!,
@@ -448,7 +445,7 @@ class MockData {
         price: 20000,
         costPrice: 9000,
         category: ProductCategory.nonCoffee,
-        stock: 32,
+        stock: 45,
         lowStockThreshold: 15,
         description: 'Bubuk ceremonial Uji Matcha asli dengan susu creamy lembut nan menyegarkan',
         imageUrl: presetPhotography['Matcha Latte']!,
@@ -463,7 +460,7 @@ class MockData {
         price: 19000,
         costPrice: 8000,
         category: ProductCategory.nonCoffee,
-        stock: 0, // OUT OF STOCK for realistic demo
+        stock: 45,
         lowStockThreshold: 10,
         description: 'Cokelat artisanal Belgia pekat dipadu susu hangat atau dingin',
         imageUrl: presetPhotography['Chocolate']!,
@@ -477,7 +474,7 @@ class MockData {
         price: 17000,
         costPrice: 6500,
         category: ProductCategory.food,
-        stock: 8, // LOW STOCK (8 <= 15) for demo scenario
+        stock: 45,
         lowStockThreshold: 15,
         description: 'Kentang goreng renyah bumbu rosemary sea-salt & saus sambal spesial',
         imageUrl: presetPhotography['French Fries']!,
@@ -492,7 +489,7 @@ class MockData {
         price: 16000,
         costPrice: 7000,
         category: ProductCategory.pastry,
-        stock: 24,
+        stock: 45,
         lowStockThreshold: 10,
         description: 'French butter croissant berlapis garing di luar dan lembut wangi di dalam',
         imageUrl: presetPhotography['Croissant']!,
@@ -506,7 +503,7 @@ class MockData {
         price: 28000,
         costPrice: 13000,
         category: ProductCategory.food,
-        stock: 18,
+        stock: 45,
         lowStockThreshold: 12,
         description: 'Nasi pulen hangat dengan dada ayam fillet katsu renyah & saus teriyaki gurih',
         imageUrl: presetPhotography['Chicken Katsu Rice']!,
@@ -521,15 +518,10 @@ class MockData {
 
   /// Identifier of the demo's currently-open cashier shift.
   ///
-  /// SEED ATTRIBUTION POLICY: the demo's sample orders are authored data, not
-  /// real history, so they are attributed to [seedActiveShiftId] explicitly in
-  /// source. That keeps the demo's opening drawer figure meaningful and keeps
-  /// the shift id and its orders from drifting apart.
-  ///
-  /// This is deliberately NOT done at runtime. `PosProvider` never backfills a
-  /// missing `shiftId` onto an existing order — an order whose shift is unknown
-  /// stays unknown and is excluded from every drawer total (see
-  /// `PosProvider.unattributedPaidCashOrders`).
+  /// The demo opens with this shift already open and no transactions, so the
+  /// first sale of a session belongs to it. Nothing is backfilled at runtime:
+  /// an order whose shift is unknown stays unknown and is excluded from every
+  /// drawer total (see `PosProvider.unattributedPaidCashOrders`).
   static const String seedActiveShiftId = 'SHIFT-01';
 
   static ShiftInfo getInitialShift() {
@@ -571,134 +563,12 @@ class MockData {
     ];
   }
 
-  static List<Order> getInitialOrders(List<Product> products) {
-    final now = DateTime.now();
-
-    // Sample previous order 1: Americano + Croissant (QRIS)
-    final prodAmericano = products.firstWhere((p) => p.name == 'Americano');
-    final prodCroissant = products.firstWhere((p) => p.name == 'Croissant');
-
-    final items1 = [
-      CartItem(product: prodAmericano, quantity: 1),
-      CartItem(product: prodCroissant, quantity: 1),
-    ];
-    final order1 = Order.create(
-      orderNumber: 'ORD-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-0001',
-      tableNumber: 'A03',
-      items: items1,
-      cashierName: 'Siti Rahma (Kasir)',
-      paymentMethod: PaymentMethod.qris,
-      status: OrderStatus.paid,
-      paidAmount: 35650,
-      createdAt: now.subtract(const Duration(hours: 3, minutes: 15)),
-      // Seed attribution policy: authored demo data, explicitly bound to the
-      // demo's open shift. See MockData.seedActiveShiftId.
-      shiftId: seedActiveShiftId,
-      taxRate: 0.10,
-      serviceChargeRate: 0.05,
-      isTaxEnabled: true,
-      isServiceEnabled: true,
-    );
-
-    // Sample previous order 2: Matcha Latte x2 + Chicken Katsu (Cash)
-    final prodMatcha = products.firstWhere((p) => p.name == 'Matcha Latte');
-    final prodKatsu = products.firstWhere((p) => p.name == 'Chicken Katsu Rice');
-    final items2 = [
-      CartItem(product: prodMatcha, quantity: 2),
-      CartItem(product: prodKatsu, quantity: 1),
-    ];
-    final order2 = Order.create(
-      orderNumber: 'ORD-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-0002',
-      tableNumber: 'B01',
-      items: items2,
-      cashierName: 'Siti Rahma (Kasir)',
-      paymentMethod: PaymentMethod.cash,
-      status: OrderStatus.paid,
-      paidAmount: 100000,
-      changeAmount: 21800,
-      createdAt: now.subtract(const Duration(hours: 1, minutes: 45)),
-      shiftId: seedActiveShiftId,
-      taxRate: 0.10,
-      serviceChargeRate: 0.05,
-      isTaxEnabled: true,
-      isServiceEnabled: true,
-    );
-
-    // Sample previous order 3: Kopi Susu x3 + French Fries (Debit Card)
-    final prodKopi = products.firstWhere((p) => p.name == 'Kopi Susu Gula Aren');
-    final prodFries = products.firstWhere((p) => p.name == 'French Fries');
-    final items3 = [
-      CartItem(product: prodKopi, quantity: 3),
-      CartItem(product: prodFries, quantity: 1),
-    ];
-    final order3 = Order.create(
-      orderNumber: 'ORD-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-0003',
-      tableNumber: 'A01',
-      items: items3,
-      cashierName: 'Siti Rahma (Kasir)',
-      paymentMethod: PaymentMethod.debitCard,
-      status: OrderStatus.paid,
-      paidAmount: 81650,
-      changeAmount: 0,
-      createdAt: now.subtract(const Duration(minutes: 40)),
-      shiftId: seedActiveShiftId,
-      taxRate: 0.10,
-      serviceChargeRate: 0.05,
-      isTaxEnabled: true,
-      isServiceEnabled: true,
-    );
-
-    return [order3, order2, order1];
-  }
-
-
-  /// Seeded audit rows for the demo.
+  /// Sample-data marker for the inventory history.
   ///
-  /// These are sample data, not real operations. Their [reason] text is
-  /// prefixed with [samplePrefix] so the inventory history can label them
-  /// honestly instead of presenting them as genuine adjustments.
+  /// No adjustment rows are seeded any more — a fresh demo (and a reset) opens
+  /// with an empty history. The marker stays as an honesty guard: any row whose
+  /// reason contains it is badged "Data Contoh" by the inventory screen.
   static const String samplePrefix = '[Data contoh]';
-
-  static List<StockAdjustment> getInitialStockAdjustments() {
-    final now = DateTime.now();
-    return [
-      StockAdjustment(
-        id: 'ADJ-001',
-        productId: 'PRD-001',
-        productName: 'Kopi Susu Gula Aren',
-        type: AdjustmentType.add,
-        quantity: 25,
-        previousStock: 15,
-        newStock: 40,
-        reason: '$samplePrefix Restock biji kopi house blend & susu fresh',
-        timestamp: now.subtract(const Duration(hours: 6)),
-      ),
-      StockAdjustment(
-        id: 'ADJ-002',
-        productId: 'PRD-005',
-        productName: 'French Fries',
-        type: AdjustmentType.remove,
-        quantity: 2,
-        previousStock: 10,
-        newStock: 8,
-        reason: '$samplePrefix Bahan rusak/terbuka kemasan saat penyimpanan',
-        timestamp: now.subtract(const Duration(hours: 4)),
-      ),
-      StockAdjustment(
-        id: 'ADJ-MAT-001',
-        productId: 'MAT-001',
-        productName: 'Coffee Beans',
-        type: AdjustmentType.add,
-        quantity: 2000,
-        previousStock: 3000,
-        newStock: 5000,
-        reason: '$samplePrefix Pengiriman supplier biji kopi arabika',
-        timestamp: now.subtract(const Duration(days: 1)),
-        unit: 'gram',
-        isRawMaterial: true,
-      ),
-    ];
-  }
 
   static List<RawMaterial> getInitialRawMaterials() {
     return [

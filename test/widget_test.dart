@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cafe_pos_demo/main.dart';
+import 'package:cafe_pos_demo/data/mock_data.dart';
 import 'package:cafe_pos_demo/state/pos_provider.dart';
 import 'package:cafe_pos_demo/models/order.dart';
 import 'package:cafe_pos_demo/models/product.dart';
@@ -166,11 +167,15 @@ void main() {
       expect(completedOrder.status, OrderStatus.paid);
       expect(completedOrder.paymentMethod, PaymentMethod.qris);
 
-      // Step 21: Stock decreases (Strawberry Matcha: 20 -> 19, French Fries: 8 -> 7)
+      // Step 21: Stock decreases (Strawberry Matcha: 20 -> 19, and French Fries
+      // by one off its authored menu baseline).
+      final friesBaseline = MockData.getInitialProducts()
+          .firstWhere((p) => p.id == 'PRD-005')
+          .stock;
       final matchaAfter = pos.products.firstWhere((p) => p.name == 'Strawberry Matcha');
       final friesAfter = pos.products.firstWhere((p) => p.name == 'French Fries');
       expect(matchaAfter.stock, 19);
-      expect(friesAfter.stock, 7);
+      expect(friesAfter.stock, friesBaseline - 1);
 
       // Step 22-26: Owner views Orders and Sales
       pos.login('owner', 'owner123');
@@ -182,7 +187,8 @@ void main() {
       final inventoryMatcha = pos.products.firstWhere((p) => p.name == 'Strawberry Matcha');
       expect(inventoryMatcha.stock, 19);
 
-      // Extra demonstration: Owner updates French Fries stock (+20) -> 27
+      // Extra demonstration: Owner restocks French Fries (+20) on top of what
+      // survived the sale.
       pos.adjustStock(
         productId: friesAfter.id,
         type: AdjustmentType.add,
@@ -192,10 +198,10 @@ void main() {
       );
 
       final friesUpdated = pos.products.firstWhere((p) => p.name == 'French Fries');
-      expect(friesUpdated.stock, 27);
+      expect(friesUpdated.stock, friesBaseline - 1 + 20);
       expect(pos.stockAdjustments.first.productName, 'French Fries');
       expect(pos.stockAdjustments.first.quantity, 20);
-      expect(pos.stockAdjustments.first.newStock, 27);
+      expect(pos.stockAdjustments.first.newStock, friesBaseline - 1 + 20);
     });
   });
 

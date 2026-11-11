@@ -375,6 +375,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
                 '• Pesanan aktif dan keranjang kasir\n'
                 '• Riwayat shift sesi ini\n'
                 '• Riwayat penyesuaian stok\n'
+                '• Stok produk dan bahan baku, dikembalikan ke stok awal demo\n'
                 '• Riwayat struk sesi ini',
                 style: TextStyle(fontSize: 12, height: 1.5),
               ),
@@ -407,7 +408,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
                     ),
                     SizedBox(height: 6),
                     Text(
-                      '• Stok produk dan bahan baku (dipertahankan persis)\n'
                       '• Menu, kategori, dan resep\n'
                       '• Akun Owner & Kasir\n'
                       '• Konfigurasi bisnis dan pengaturan aplikasi',
@@ -461,8 +461,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> with SingleTi
       widget.pos.resetDemoData();
       ok = true;
       message = 'Data operasional demo berhasil dikosongkan. '
-          'Omzet kini nol, stok produk dan bahan baku tetap dipertahankan, '
-          'dan satu shift demo terbuka untuk penjualan berikutnya.';
+          'Omzet kini nol, stok produk dan bahan baku dikembalikan ke stok '
+          'awal demo, dan satu shift demo terbuka untuk penjualan berikutnya.';
     } catch (_) {
       ok = false;
       // The underlying error is deliberately not surfaced: it could carry

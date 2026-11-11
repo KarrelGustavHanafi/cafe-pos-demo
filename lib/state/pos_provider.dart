@@ -106,13 +106,9 @@ class PosProvider extends ChangeNotifier {
     _products = MockData.getInitialProducts();
     _currentShift = MockData.getInitialShift();
     _pastShifts = MockData.getPastShifts();
-    // Orders are seeded through the repository in the constructor, before
-    // _initData runs, because seed orders need `_products` to resolve their
-    // line items. Injected orders *replace* the mock set outright rather than
-    // appending to it, so seeded totals stay predictable in tests.
-    _orderRepository.replaceAll(
-      initialOrders ?? MockData.getInitialOrders(_products),
-    );
+    // A fresh demo starts with no transactions. Only an injected `initialOrders`
+    // (tests) can pre-load history; otherwise every report opens at zero.
+    _orderRepository.replaceAll(initialOrders ?? const <Order>[]);
     _categories = [
       ProductCategory.coffee,
       ProductCategory.nonCoffee,
@@ -121,7 +117,7 @@ class PosProvider extends ChangeNotifier {
       ProductCategory.dessert,
       ProductCategory.pastry,
     ];
-    _stockAdjustments = MockData.getInitialStockAdjustments();
+    _stockAdjustments = <StockAdjustment>[];
     _settings = const CafeSettings();
     _rawMaterials = MockData.getInitialRawMaterials();
     _recipes = MockData.getInitialRecipes();
@@ -153,6 +149,7 @@ class PosProvider extends ChangeNotifier {
   /// re-stating the rule inline, while keeping the repository itself private
   /// to the state layer.
   List<Order> get paidOrders => _orderRepository.paidOrders;
+
   ShiftInfo get currentShift => _currentShift;
   List<ShiftInfo> get pastShifts => List.unmodifiable(_pastShifts);
   List<ShiftInfo> get allShifts => [_currentShift, ..._pastShifts];
@@ -252,6 +249,7 @@ class PosProvider extends ChangeNotifier {
     debugThrowBeforeResetApply?.call();
 
     _orderRepository.replaceAll(const <Order>[]);
+    _restoreBaselineStock();
     _stockAdjustments.clear();
     _pastShifts.clear();
     _currentShift = MockData.getInitialShift();
@@ -260,9 +258,9 @@ class PosProvider extends ChangeNotifier {
     _receiptService.clearSessionReceipts();
 
     // Notification bookkeeping only, no send: drop the trackers for orders that
-    // no longer exist, then re-seed the low-stock set from the stock that is
-    // being preserved, so a reset session cannot re-alert an item the owner has
-    // already been warned about.
+    // no longer exist, then re-seed the low-stock set from the restored stock, so
+    // a reset session cannot re-alert an item the owner has already been warned
+    // about.
     _telegramNotificationService.resetTracking();
     _telegramNotificationService.seedAlreadyLowStockItems([
       ..._products
@@ -272,6 +270,30 @@ class PosProvider extends ChangeNotifier {
     ]);
 
     notifyListeners();
+  }
+
+  /// Puts every seeded product and raw material back to the stock in [MockData].
+  ///
+  /// Sales and stock adjustments move stock during a session, so a reset returns
+  /// the demo to the same stock baseline a freshly opened tab has. Ids that are
+  /// not in the baseline (items the Owner added) keep their current stock; the
+  /// catalogue itself - menu, prices, recipes - is never rebuilt.
+  void _restoreBaselineStock() {
+    final productStock = {
+      for (final p in MockData.getInitialProducts()) p.id: p.stock,
+    };
+    for (final p in _products) {
+      final baseline = productStock[p.id];
+      if (baseline != null) p.stock = baseline;
+    }
+
+    final materialStock = {
+      for (final m in MockData.getInitialRawMaterials()) m.id: m.stock,
+    };
+    for (final m in _rawMaterials) {
+      final baseline = materialStock[m.id];
+      if (baseline != null) m.stock = baseline;
+    }
   }
 
   // ==========================================
@@ -947,6 +969,9 @@ class PosProvider extends ChangeNotifier {
   }) {
     final product = _products.first;
     final order = Order(
+      // Identity-bearing like every real order (see `Order.create`), so
+      // id-keyed UI logic behaves the same here as in production.
+      id: 'ord_test_${_orderRepository.count + 1}',
       orderNumber: 'ORD-TEST-${_orderRepository.count + 1}',
       tableNumber: 'Takeaway',
       items: [CartItem(product: product, quantity: 1)],

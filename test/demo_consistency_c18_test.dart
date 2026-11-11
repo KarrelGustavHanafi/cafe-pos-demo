@@ -92,14 +92,11 @@ void main() {
   });
 
   group('inventory history honesty', () {
-    test('seeded rows are marked as sample data', () {
-      final seeded = MockData.getInitialStockAdjustments();
+    test('a fresh demo opens with no inventory history', () {
+      final pos = PosProvider()..login('owner', 'owner123');
 
-      expect(seeded, isNotEmpty);
-      for (final adj in seeded) {
-        expect(adj.reason, startsWith(MockData.samplePrefix),
-            reason: '${adj.id} must be labelled as sample data');
-      }
+      // Stock history is session data: the demo starts (and resets) with none.
+      expect(pos.stockAdjustments, isEmpty);
     });
 
     test('real user adjustments are not labelled as sample data', () {
@@ -119,9 +116,9 @@ void main() {
       expect(real.reason, 'Restok dari supplier');
     });
 
-    test('real and sample rows coexist without confusing each other', () {
+    test('a real adjustment is recorded once and is never badged', () {
       final pos = PosProvider()..login('owner', 'owner123');
-      final before = pos.stockAdjustments.length;
+      expect(pos.stockAdjustments, isEmpty);
 
       pos.adjustStock(
         productId: pos.products.first.id,
@@ -130,15 +127,13 @@ void main() {
         reason: 'Barang rusak',
       );
 
-      expect(pos.stockAdjustments.length, before + 1);
-      // Newest entry is the real one; seeded samples remain flagged.
+      expect(pos.stockAdjustments.length, 1);
+      // The sample badge is an honesty guard; a genuine adjustment must
+      // never carry it.
       expect(pos.stockAdjustments.first.reason, isNot(contains(MockData.samplePrefix)));
-      final sampleRows =
-          pos.stockAdjustments.where((a) => a.reason.contains(MockData.samplePrefix));
-      expect(sampleRows.length, 3, reason: 'all three seeded rows stay flagged');
     });
 
-    testWidgets('history screen shows a Data Contoh badge for sample rows',
+    testWidgets('history screen shows a new real adjustment, unbadged',
         (tester) async {
       final pos = PosProvider()..login('owner', 'owner123');
 
@@ -158,11 +153,8 @@ void main() {
       await tester.tap(find.textContaining('Riwayat'));
       await tester.pumpAndSettle();
 
-      // The seeded sample rows must be visibly distinguished.
-      expect(find.text('Data Contoh'), findsWidgets,
-          reason: 'every seeded row should carry the sample badge');
-
-      // A real adjustment made in-session must NOT be badged as sample data.
+      // A real adjustment made in-session appears and is NOT badged as
+      // sample data.
       pos.adjustStock(
         productId: pos.products.first.id,
         type: AdjustmentType.add,
@@ -186,6 +178,8 @@ void main() {
         findsWidgets,
         reason: 'a genuine adjustment must appear in history',
       );
+      expect(find.text('Data Contoh'), findsNothing,
+          reason: 'no seeded sample rows exist any more');
     });
   });
 

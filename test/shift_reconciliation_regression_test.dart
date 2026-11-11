@@ -361,15 +361,27 @@ void main() {
     });
   });
 
-  group('seed attribution policy', () {
-    test('seeded demo orders are explicitly bound to the open demo shift', () {
+  group('shift attribution policy', () {
+    test('sold orders carry the open shift, never attributed later', () {
       final pos = newProvider();
       final shift = pos.currentShift.shiftId;
 
-      // Seed orders are attributed in source, not at runtime.
-      final seeded = pos.orders.where((o) => o.shiftId == shift).toList();
-      expect(seeded, isNotEmpty);
-      // No seeded order is left unattributed.
+      // The demo opens with no transactions at all.
+      expect(pos.orders, isEmpty);
+      expect(pos.unattributedCashTotal, 0);
+
+      pos.login('cashier', 'cashier123');
+      pos.addToCart(pos.activeProducts.firstWhere((p) => p.stock > 0));
+      pos.prepareCheckoutOrder();
+      final order = pos.currentOrder!;
+      pos.completePayment(
+        method: order.paymentMethod,
+        paidAmount: order.grandTotal,
+        changeAmount: 0,
+      );
+
+      // Attribution happens when the sale is created, not by a runtime backfill.
+      expect(pos.orders.single.shiftId, shift);
       expect(pos.unattributedCashTotal, 0);
     });
   });

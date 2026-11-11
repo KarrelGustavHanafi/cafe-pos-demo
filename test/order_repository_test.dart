@@ -451,12 +451,26 @@ void main() {
     test('reports route through the repository without changing results', () {
       final pos = PosProvider();
 
-      // Seeded demo orders must all be reachable through the repository-backed
-      // getters, and the seed shift must own them.
-      expect(pos.orders, isNotEmpty);
-      expect(pos.getOrdersForPeriod(ReportPeriod.today), isNotEmpty);
-      expect(pos.unattributedCashTotal, 0,
-          reason: 'seed orders are attributed in source, never at runtime');
+      // A fresh demo has no transactions, so every report starts empty.
+      expect(pos.orders, isEmpty);
+      expect(pos.getOrdersForPeriod(ReportPeriod.today), isEmpty);
+      expect(pos.unattributedCashTotal, 0);
+
+      pos.login('cashier', 'cashier123');
+      pos.addToCart(pos.activeProducts.firstWhere((p) => p.stock > 0));
+      pos.prepareCheckoutOrder();
+      final order = pos.currentOrder!;
+      pos.completePayment(
+        method: order.paymentMethod,
+        paidAmount: order.grandTotal,
+        changeAmount: 0,
+      );
+
+      // The sale is reachable through the repository-backed getters and carries
+      // the open shift from the start, never attributed after the fact.
+      expect(pos.getOrdersForPeriod(ReportPeriod.today).single.id, order.id);
+      expect(order.shiftId, pos.currentShift.shiftId);
+      expect(pos.unattributedCashTotal, 0);
     });
 
     test('injected orders replace the mock set', () {

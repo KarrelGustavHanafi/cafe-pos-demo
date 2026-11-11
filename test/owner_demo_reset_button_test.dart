@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:cafe_pos_demo/data/mock_data.dart';
 import 'package:cafe_pos_demo/models/business_config.dart';
 import 'package:cafe_pos_demo/models/receipt_data.dart';
 import 'package:cafe_pos_demo/models/user.dart';
@@ -156,7 +157,7 @@ void main() {
       expect(inDialog('struk sesi ini'), findsOneWidget);
 
       expect(
-        inDialog('Stok produk dan bahan baku (dipertahankan persis)'),
+        inDialog('Stok produk dan bahan baku, dikembalikan ke stok awal demo'),
         findsOneWidget,
       );
       expect(inDialog('Menu, kategori, dan resep'), findsOneWidget);
@@ -200,8 +201,10 @@ void main() {
       expect(pos.pastShifts, isNotEmpty);
       expect(pos.receiptService.receiptHistory, isNotEmpty);
 
-      final stockBefore = pos.products.map((p) => p.stock).toList();
-      final materialsBefore = pos.rawMaterials.map((m) => m.stock).toList();
+      final productBaseline =
+          MockData.getInitialProducts().map((p) => p.stock).toList();
+      final materialBaseline =
+          MockData.getInitialRawMaterials().map((m) => m.stock).toList();
       final productsBefore = pos.products.map((p) => p.id).toList();
       final pricesBefore = pos.products.map((p) => p.price).toList();
       final categoriesBefore = pos.categories.map((c) => c.name).toList();
@@ -225,9 +228,9 @@ void main() {
       expect(pos.currentOrder, isNull);
       expect(pos.cart, isEmpty);
 
-      // Stock is untouched.
-      expect(pos.products.map((p) => p.stock).toList(), stockBefore);
-      expect(pos.rawMaterials.map((m) => m.stock).toList(), materialsBefore);
+      // Stock is back at the demo baseline the sale had moved it away from.
+      expect(pos.products.map((p) => p.stock).toList(), productBaseline);
+      expect(pos.rawMaterials.map((m) => m.stock).toList(), materialBaseline);
 
       // Catalogue, account and configuration survive.
       expect(pos.products.map((p) => p.id).toList(), productsBefore);

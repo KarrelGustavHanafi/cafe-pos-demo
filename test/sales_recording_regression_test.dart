@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:cafe_pos_demo/data/mock_data.dart';
 import 'package:cafe_pos_demo/models/order.dart';
 import 'package:cafe_pos_demo/models/product.dart';
 import 'package:cafe_pos_demo/repositories/order_repository.dart';
@@ -353,31 +354,31 @@ void main() {
   // G. Demo reset and role boundaries stay intact
   // ==========================================
   group('existing guarantees hold', () {
-    test('reset demo clears sales but keeps stock', () async {
+    test('reset demo clears sales and restores baseline stock', () async {
       SharedPreferences.setMockInitialValues({});
       final pos = PosProvider();
       await Future<void>.delayed(const Duration(milliseconds: 100));
       pos.login('owner', 'owner123');
 
+      final productBaseline =
+          MockData.getInitialProducts().map((p) => p.stock).toList();
+      final materialBaseline =
+          MockData.getInitialRawMaterials().map((m) => m.stock).toList();
+
       pos.addToCart(inStockProduct(pos));
       payCash(pos);
       expect(pos.getSalesTotalForPeriod(ReportPeriod.today), greaterThan(0));
-
-      // Reset keeps stock exactly as it stands at reset time; the sale above
-      // legitimately deducted it, so the snapshot is taken afterwards.
-      final stockBeforeReset = {
-        for (final p in pos.products) p.id: p.stock,
-      };
+      expect(pos.products.map((p) => p.stock).toList(), isNot(productBaseline),
+          reason: 'the sale must actually move stock');
 
       pos.resetDemoData();
 
       expect(pos.orders, isEmpty);
       expect(pos.getSalesTotalForPeriod(ReportPeriod.today), 0);
       expect(pos.getTransactionsCountForPeriod(ReportPeriod.today), 0);
-      for (final p in pos.products) {
-        expect(p.stock, stockBeforeReset[p.id],
-            reason: 'stock preserved: ${p.id}');
-      }
+      // Reset lands on the same baseline a freshly opened demo has.
+      expect(pos.products.map((p) => p.stock).toList(), productBaseline);
+      expect(pos.rawMaterials.map((m) => m.stock).toList(), materialBaseline);
       // A fresh shift is open, so selling still works.
       expect(pos.hasActiveShift, isTrue);
     });
@@ -386,11 +387,17 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final pos = PosProvider();
       await Future<void>.delayed(const Duration(milliseconds: 100));
+      pos.debugSeedOrderForTest(
+        paymentMethod: PaymentMethod.cash,
+        grandTotal: 1000,
+        createdAt: DateTime.now(),
+        shiftId: pos.currentShift.shiftId,
+      );
 
       pos.login('cashier', 'cashier123');
       expect(pos.canResetDemoData, isFalse);
       expect(() => pos.resetDemoData(), throwsA(isA<StateError>()));
-      expect(pos.orders, isNotEmpty);
+      expect(pos.orders, isNotEmpty, reason: 'a refused reset clears nothing');
 
       pos.login('owner', 'owner123');
       expect(pos.canResetDemoData, isTrue);
